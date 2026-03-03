@@ -90,12 +90,12 @@
         </DelphiCompile>
         <DCCReference Include="Tests.Driver.Zeos.pas"/>
         <DCCReference Include="Tests.Consts.pas"/>
-        <DCCReference Include="..\Source\Drivers\dbe.driver.zeos.pas"/>
-        <DCCReference Include="..\Source\Drivers\dbe.driver.zeos.transaction.pas"/>
-        <DCCReference Include="..\Source\Drivers\dbe.factory.zeos.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.DriverConnection.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.FactoryConnection.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.FactoryInterfaces.pas"/>
+        <DCCReference Include="..\Source\Core\DriverConnection.pas"/>
+        <DCCReference Include="..\Source\Core\FactoryConnection.pas"/>
+        <DCCReference Include="..\Source\Core\FactoryInterfaces.pas"/>
+        <DCCReference Include="..\Source\Drivers\DriverZeos.pas"/>
+        <DCCReference Include="..\Source\Drivers\DriverZeosTransaction.pas"/>
+        <DCCReference Include="..\Source\Drivers\FactoryZeos.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

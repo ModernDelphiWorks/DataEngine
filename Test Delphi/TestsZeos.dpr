@@ -15,12 +15,12 @@ uses
   DUnitX.TestFramework,
   Tests.Driver.Zeos in 'Tests.Driver.Zeos.pas',
   Tests.Consts in 'Tests.Consts.pas',
-  dbe.driver.zeos in '..\Source\Drivers\dbe.driver.zeos.pas',
-  dbe.driver.zeos.transaction in '..\Source\Drivers\dbe.driver.zeos.transaction.pas',
-  dbe.factory.zeos in '..\Source\Drivers\dbe.factory.zeos.pas',
-  DBEngine.DriverConnection in '..\Source\Core\DBEngine.DriverConnection.pas',
-  DBEngine.FactoryConnection in '..\Source\Core\DBEngine.FactoryConnection.pas',
-  DBEngine.FactoryInterfaces in '..\Source\Core\DBEngine.FactoryInterfaces.pas';
+  DriverConnection in '..\Source\Core\DriverConnection.pas',
+  FactoryConnection in '..\Source\Core\FactoryConnection.pas',
+  FactoryInterfaces in '..\Source\Core\FactoryInterfaces.pas',
+  DriverZeos in '..\Source\Drivers\DriverZeos.pas',
+  DriverZeosTransaction in '..\Source\Drivers\DriverZeosTransaction.pas',
+  FactoryZeos in '..\Source\Drivers\FactoryZeos.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

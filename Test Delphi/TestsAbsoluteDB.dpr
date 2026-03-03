@@ -15,12 +15,12 @@ uses
   DUnitX.TestFramework,
   Tests.Driver.AbsoluteDB in 'Tests.Driver.AbsoluteDB.pas',
   Tests.Consts in 'Tests.Consts.pas',
-  dbe.driver.absolutedb in '..\Source\Drivers\dbe.driver.absolutedb.pas',
-  dbe.driver.absolutedb.transaction in '..\Source\Drivers\dbe.driver.absolutedb.transaction.pas',
-  dbe.factory.absolutedb in '..\Source\Drivers\dbe.factory.absolutedb.pas',
-  DBEngine.DriverConnection in '..\Source\Core\DBEngine.DriverConnection.pas',
-  DBEngine.FactoryConnection in '..\Source\Core\DBEngine.FactoryConnection.pas',
-  DBEngine.FactoryInterfaces in '..\Source\Core\DBEngine.FactoryInterfaces.pas';
+  DriverConnection in '..\Source\Core\DriverConnection.pas',
+  FactoryConnection in '..\Source\Core\FactoryConnection.pas',
+  FactoryInterfaces in '..\Source\Core\FactoryInterfaces.pas',
+  DriverAbsoluteDB in '..\Source\Drivers\DriverAbsoluteDB.pas',
+  DriverAbsoluteDBTransaction in '..\Source\Drivers\DriverAbsoluteDBTransaction.pas',
+  FactoryAbsoluteDB in '..\Source\Drivers\FactoryAbsoluteDB.pas';
 
 var
   runner: ITestRunner;

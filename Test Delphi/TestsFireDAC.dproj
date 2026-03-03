@@ -90,15 +90,15 @@
         </DelphiCompile>
         <DCCReference Include="Tests.Driver.FireDAC.pas"/>
         <DCCReference Include="Tests.Consts.pas"/>
-        <DCCReference Include="..\Source\Drivers\DBEngine.DriverFireDac.pas"/>
-        <DCCReference Include="..\Source\Drivers\DBEngine.DriverFireDacTransaction.pas"/>
-        <DCCReference Include="..\Source\Drivers\DBEngine.FactoryFireDac.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.Consts.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.DriverConnection.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.FactoryConnection.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.FactoryInterfaces.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.GuardConnection.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.PoolConnection.pas"/>
+        <DCCReference Include="..\Source\Drivers\DriverFireDac.pas"/>
+        <DCCReference Include="..\Source\Drivers\DriverFireDacTransaction.pas"/>
+        <DCCReference Include="..\Source\Drivers\FactoryFireDac.pas"/>
+        <DCCReference Include="..\Source\Core\Consts.pas"/>
+        <DCCReference Include="..\Source\Core\DriverConnection.pas"/>
+        <DCCReference Include="..\Source\Core\FactoryConnection.pas"/>
+        <DCCReference Include="..\Source\Core\FactoryInterfaces.pas"/>
+        <DCCReference Include="..\Source\Core\GuardConnection.pas"/>
+        <DCCReference Include="..\Source\Core\PoolConnection.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -1005,7 +1005,6 @@
                 <ProjectRoot Platform="Win64x" Name="$(PROJECTNAME)"/>
             </Deployment>
             <Platforms>
-                <Platform value="Linux64">False</Platform>
                 <Platform value="Win32">True</Platform>
                 <Platform value="Win64">False</Platform>
             </Platforms>

@@ -15,12 +15,12 @@ uses
   DUnitX.TestFramework,
   Tests.Driver.SQLite in 'Tests.Driver.SQLite.pas',
   Tests.Consts in 'Tests.Consts.pas',
-  dbe.driver.sqlite3 in '..\Source\Drivers\dbe.driver.sqlite3.pas',
-  dbe.driver.sqlite3.transaction in '..\Source\Drivers\dbe.driver.sqlite3.transaction.pas',
-  dbe.factory.sqlite3 in '..\Source\Drivers\dbe.factory.sqlite3.pas',
-  DBEngine.DriverConnection in '..\Source\Core\DBEngine.DriverConnection.pas',
-  DBEngine.FactoryConnection in '..\Source\Core\DBEngine.FactoryConnection.pas',
-  DBEngine.FactoryInterfaces in '..\Source\Core\DBEngine.FactoryInterfaces.pas';
+  DriverConnection in '..\Source\Core\DriverConnection.pas',
+  FactoryConnection in '..\Source\Core\FactoryConnection.pas',
+  FactoryInterfaces in '..\Source\Core\FactoryInterfaces.pas',
+  DriverSQLite3 in '..\Source\Drivers\DriverSQLite3.pas',
+  DriverSQLite3Transaction in '..\Source\Drivers\DriverSQLite3Transaction.pas',
+  FactorySQLite3 in '..\Source\Drivers\FactorySQLite3.pas';
 
 var
   runner: ITestRunner;

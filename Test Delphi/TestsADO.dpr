@@ -15,12 +15,12 @@ uses
   DUnitX.TestFramework,
   Tests.Driver.ADO in 'Tests.Driver.ADO.pas',
   Tests.Consts in 'Tests.Consts.pas',
-  DBEngine.DriverConnection in '..\Source\Core\DBEngine.DriverConnection.pas',
-  DBEngine.FactoryConnection in '..\Source\Core\DBEngine.FactoryConnection.pas',
-  DBEngine.FactoryInterfaces in '..\Source\Core\DBEngine.FactoryInterfaces.pas',
-  DBE.DriverADO in '..\Source\Drivers\DBE.DriverADO.pas',
-  DBE.DriverADOTransaction in '..\Source\Drivers\DBE.DriverADOTransaction.pas',
-  DBE.FactoryADO in '..\Source\Drivers\DBE.FactoryADO.pas';
+  DriverConnection in '..\Source\Core\DriverConnection.pas',
+  FactoryConnection in '..\Source\Core\FactoryConnection.pas',
+  FactoryInterfaces in '..\Source\Core\FactoryInterfaces.pas',
+  DriverADO in '..\Source\Drivers\DriverADO.pas',
+  DriverADOTransaction in '..\Source\Drivers\DriverADOTransaction.pas',
+  FactoryADO in '..\Source\Drivers\FactoryADO.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

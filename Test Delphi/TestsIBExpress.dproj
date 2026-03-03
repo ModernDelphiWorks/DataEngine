@@ -90,12 +90,12 @@
         </DelphiCompile>
         <DCCReference Include="Tests.Driver.IBExpress.pas"/>
         <DCCReference Include="Tests.Consts.pas"/>
-        <DCCReference Include="..\Source\Drivers\dbe.driver.ibexpress.pas"/>
-        <DCCReference Include="..\Source\Drivers\dbe.driver.ibexpress.transaction.pas"/>
-        <DCCReference Include="..\Source\Drivers\dbe.factory.ibexpress.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.DriverConnection.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.FactoryConnection.pas"/>
-        <DCCReference Include="..\Source\Core\DBEngine.FactoryInterfaces.pas"/>
+        <DCCReference Include="..\Source\Core\DriverConnection.pas"/>
+        <DCCReference Include="..\Source\Core\FactoryConnection.pas"/>
+        <DCCReference Include="..\Source\Core\FactoryInterfaces.pas"/>
+        <DCCReference Include="..\Source\Drivers\DriverIBExpress.pas"/>
+        <DCCReference Include="..\Source\Drivers\DriverIBExpressTransaction.pas"/>
+        <DCCReference Include="..\Source\Drivers\FactoryIBExpress.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

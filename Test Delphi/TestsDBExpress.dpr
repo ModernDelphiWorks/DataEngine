@@ -15,12 +15,15 @@ uses
   DUnitX.TestFramework,
   Tests.Driver.DBExpress in 'Tests.Driver.DBExpress.pas',
   Tests.Consts in 'Tests.Consts.pas',
-  DriverConnection in '..\Source\Core\DriverConnection.pas',
-  FactoryConnection in '..\Source\Core\FactoryConnection.pas',
-  FactoryInterfaces in '..\Source\Core\FactoryInterfaces.pas',
-  DriverDBExpress in '..\Source\Drivers\DriverDBExpress.pas',
-  DriverDBExpressTransaction in '..\Source\Drivers\DriverDBExpressTransaction.pas',
-  FactoryDBExpress in '..\Source\Drivers\FactoryDBExpress.pas';
+  DataEngine.DriverDBExpress in '..\Source\Drivers\DataEngine.DriverDBExpress.pas',
+  DataEngine.DriverDBExpressTransaction in '..\Source\Drivers\DataEngine.DriverDBExpressTransaction.pas',
+  DataEngine.FactoryDBExpress in '..\Source\Drivers\DataEngine.FactoryDBExpress.pas',
+  DataEngine.Consts in '..\Source\Core\DataEngine.Consts.pas',
+  DataEngine.DriverConnection in '..\Source\Core\DataEngine.DriverConnection.pas',
+  DataEngine.FactoryConnection in '..\Source\Core\DataEngine.FactoryConnection.pas',
+  DataEngine.FactoryInterfaces in '..\Source\Core\DataEngine.FactoryInterfaces.pas',
+  DataEngine.GuardConnection in '..\Source\Core\DataEngine.GuardConnection.pas',
+  DataEngine.PoolConnection in '..\Source\Core\DataEngine.PoolConnection.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

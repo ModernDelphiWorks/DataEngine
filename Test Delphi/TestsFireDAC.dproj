@@ -90,15 +90,15 @@
         </DelphiCompile>
         <DCCReference Include="Tests.Driver.FireDAC.pas"/>
         <DCCReference Include="Tests.Consts.pas"/>
-        <DCCReference Include="..\Source\Drivers\DriverFireDac.pas"/>
-        <DCCReference Include="..\Source\Drivers\DriverFireDacTransaction.pas"/>
-        <DCCReference Include="..\Source\Drivers\FactoryFireDac.pas"/>
-        <DCCReference Include="..\Source\Core\Consts.pas"/>
-        <DCCReference Include="..\Source\Core\DriverConnection.pas"/>
-        <DCCReference Include="..\Source\Core\FactoryConnection.pas"/>
-        <DCCReference Include="..\Source\Core\FactoryInterfaces.pas"/>
-        <DCCReference Include="..\Source\Core\GuardConnection.pas"/>
-        <DCCReference Include="..\Source\Core\PoolConnection.pas"/>
+        <DCCReference Include="..\Source\Drivers\DataEngine.DriverFireDac.pas"/>
+        <DCCReference Include="..\Source\Drivers\DataEngine.DriverFireDacTransaction.pas"/>
+        <DCCReference Include="..\Source\Drivers\DataEngine.FactoryFireDac.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.Consts.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.DriverConnection.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.FactoryConnection.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.FactoryInterfaces.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.GuardConnection.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.PoolConnection.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

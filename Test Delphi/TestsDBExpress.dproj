@@ -90,12 +90,15 @@
         </DelphiCompile>
         <DCCReference Include="Tests.Driver.DBExpress.pas"/>
         <DCCReference Include="Tests.Consts.pas"/>
-        <DCCReference Include="..\Source\Core\DriverConnection.pas"/>
-        <DCCReference Include="..\Source\Core\FactoryConnection.pas"/>
-        <DCCReference Include="..\Source\Core\FactoryInterfaces.pas"/>
-        <DCCReference Include="..\Source\Drivers\DriverDBExpress.pas"/>
-        <DCCReference Include="..\Source\Drivers\DriverDBExpressTransaction.pas"/>
-        <DCCReference Include="..\Source\Drivers\FactoryDBExpress.pas"/>
+        <DCCReference Include="..\Source\Drivers\DataEngine.DriverDBExpress.pas"/>
+        <DCCReference Include="..\Source\Drivers\DataEngine.DriverDBExpressTransaction.pas"/>
+        <DCCReference Include="..\Source\Drivers\DataEngine.FactoryDBExpress.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.Consts.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.DriverConnection.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.FactoryConnection.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.FactoryInterfaces.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.GuardConnection.pas"/>
+        <DCCReference Include="..\Source\Core\DataEngine.PoolConnection.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

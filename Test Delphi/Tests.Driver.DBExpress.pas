@@ -11,7 +11,7 @@ uses
   Data.DbxSqlite,
   Datasnap.DBClient,
 
-  DBE.FactoryInterfaces;
+  DataEngine.FactoryInterfaces;
 
 type
   [TestFixture]
@@ -20,7 +20,7 @@ type
     FConnection: TSQLConnection;
     FDBConnection: IDBConnection;
     FDBQuery: IDBQuery;
-    FDBResultSet: IDBResultSet;
+    FDBResultSet: IDBDataSet;
   public
     [Setup]
     procedure Setup;
@@ -59,7 +59,7 @@ type
 implementation
 
 uses
-  dbe.factory.dbexpress,
+  DataEngine.FactoryDBExpress,
   Tests.Consts;
 
 { TTestDriverConnection }

@@ -1,26 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{
-  @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit FactoryDBExpress;
@@ -32,21 +20,17 @@ uses
   Classes,
   SysUtils,
   SqlExpr,
-  // DBE
-  DBE.FactoryConnection,
-  DBE.FactoryInterfaces;
+  FactoryConnection,
+  FactoryInterfaces;
 
 type
-  // Fábrica de conexão concreta com dbExpress
   TFactoryDBExpress = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TSQLConnection;
-      const ADriverName: TDriverName); overload;
-    constructor Create(const AConnection: TSQLConnection;
-      const ADriverName: TDriverName;
+      const ADriver: TDBEngineDriver); overload;
+    constructor Create(const AConnection: TSQLConnection; const ADriver: TDBEngineDriver;
       const AMonitor: ICommandMonitor); overload;
-    constructor Create(const AConnection: TSQLConnection;
-      const ADriverName: TDriverName;
+    constructor Create(const AConnection: TSQLConnection; const ADriver: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -55,44 +39,27 @@ type
 implementation
 
 uses
-  dbe.driver.dbexpress,
-  dbe.driver.dbexpress.transaction;
+  DriverDBExpress,
+  DriverDBExpressTransaction;
 
 { TFactoryDBExpress }
 
 constructor TFactoryDBExpress.Create(const AConnection: TSQLConnection;
-  const ADriverName: TDriverName);
+  const ADriver: TDBEngineDriver);
 begin
   FDriverTransaction := TDriverDBExpressTransaction.Create(AConnection);
   FDriverConnection  := TDriverDBExpress.Create(AConnection,
                                                 FDriverTransaction,
-                                                ADriverName,
-                                                FCommandMonitor,
+                                                ADriver,
                                                 FMonitorCallback);
   FAutoTransaction := False;
 end;
 
 constructor TFactoryDBExpress.Create(const AConnection: TSQLConnection;
-  const ADriverName: TDriverName; const AMonitor: ICommandMonitor);
+  const ADriver: TDBEngineDriver; const AMonitor: ICommandMonitor);
 begin
   FCommandMonitor := AMonitor;
-  Create(AConnection, ADriverName);
-end;
-
-procedure TFactoryDBExpress.AddTransaction(const AKey: String;
-  const ATransaction: TComponent);
-begin
-//  if not (ATransaction is TDBXTransaction) then
-//    raise Exception.Create('Invalid transaction type. Expected TDBXTransaction.');
-
-//  inherited AddTransaction(AKey, ATransaction);
-end;
-
-constructor TFactoryDBExpress.Create(const AConnection: TSQLConnection;
-  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
-begin
-  FMonitorCallback := AMonitorCallback;
-  Create(AConnection, ADriverName);
+  Create(AConnection, ADriver);
 end;
 
 destructor TFactoryDBExpress.Destroy;
@@ -100,6 +67,21 @@ begin
   FDriverConnection.Free;
   FDriverTransaction.Free;
   inherited;
+end;
+
+procedure TFactoryDBExpress.AddTransaction(const AKey: String;
+  const ATransaction: TComponent);
+begin
+  // DBExpress transactions are created on demand, so strict type checking might not be applicable
+  // unless we enforce TDBXTransactionWrapper, but that's internal.
+  inherited AddTransaction(AKey, ATransaction);
+end;
+
+constructor TFactoryDBExpress.Create(const AConnection: TSQLConnection;
+  const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+begin
+  FMonitorCallback := AMonitorCallback;
+  Create(AConnection, ADriver);
 end;
 
 end.

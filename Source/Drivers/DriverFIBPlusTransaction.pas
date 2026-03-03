@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverFIBPlusTransaction;
@@ -29,20 +18,19 @@ interface
 uses
   Classes,
   DB,
-
+  SysUtils,
+  Generics.Collections,
   FIBDatabase,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com IBObjects
   TDriverFIBPlusTransaction = class(TDriverTransaction)
   protected
     FConnection: TFIBDatabase;
-    FTransaction: TFIBTransaction;
+    FInternalTransaction: TFIBTransaction;
   public
-    constructor Create(AConnection: TComponent); override;
+    constructor Create(const AConnection: TComponent); override;
     destructor Destroy; override;
     procedure StartTransaction; override;
     procedure Commit; override;
@@ -54,44 +42,72 @@ implementation
 
 { TDriverFIBPlusTransaction }
 
-constructor TDriverFIBPlusTransaction.Create(AConnection: TComponent);
+constructor TDriverFIBPlusTransaction.Create(const AConnection: TComponent);
+var
+  LTransaction: TFIBTransaction;
 begin
+  inherited;
   FConnection := AConnection as TFIBDatabase;
-  FTransaction := TFIBTransaction.Create(nil);
-  FTransaction.DefaultDatabase := FConnection;
-  FTransaction.TimeoutAction := TTransactionAction.TACommit;
-  FConnection.DefaultTransaction := FTransaction;
+  FInternalTransaction := nil;
+
+  // Use existing DefaultTransaction if available, otherwise create one
+  if FConnection.DefaultTransaction <> nil then
+  begin
+    LTransaction := FConnection.DefaultTransaction;
+  end
+  else
+  begin
+    FInternalTransaction := TFIBTransaction.Create(nil);
+    FInternalTransaction.DefaultDatabase := FConnection;
+    FInternalTransaction.TimeoutAction := TACommit; 
+    FConnection.DefaultTransaction := FInternalTransaction;
+    LTransaction := FInternalTransaction;
+  end;
+
+  if LTransaction.Name = EmptyStr then
+    LTransaction.Name := 'DEFAULT';
+
+  FTransactionList.Add(UpperCase(LTransaction.Name), LTransaction);
+  FTransactionActive := LTransaction;
 end;
 
 destructor TDriverFIBPlusTransaction.Destroy;
 begin
-  FTransaction.Free;
+  if Assigned(FInternalTransaction) then
+  begin
+    if FConnection.DefaultTransaction = FInternalTransaction then
+      FConnection.DefaultTransaction := nil;
+    FInternalTransaction.Free;
+  end;
+  FInternalTransaction := nil;
+  FTransactionActive := nil;
   FConnection := nil;
   inherited;
 end;
 
 function TDriverFIBPlusTransaction.InTransaction: Boolean;
 begin
-  Result := FTransaction.InTransaction;
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
+    
+  Result := (FTransactionActive as TFIBTransaction).InTransaction;
 end;
 
 procedure TDriverFIBPlusTransaction.StartTransaction;
 begin
-  inherited;
-  if not FTransaction.InTransaction then
-    FTransaction.StartTransaction;
+  FConnection.Connected := True;
+  if not (FTransactionActive as TFIBTransaction).InTransaction then
+    (FTransactionActive as TFIBTransaction).StartTransaction;
 end;
 
 procedure TDriverFIBPlusTransaction.Commit;
 begin
-  inherited;
-  FTransaction.Commit;
+  (FTransactionActive as TFIBTransaction).Commit;
 end;
 
 procedure TDriverFIBPlusTransaction.Rollback;
 begin
-  inherited;
-  FTransaction.Rollback;
+  (FTransactionActive as TFIBTransaction).Rollback;
 end;
 
 end.

@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverZeosTransaction;
@@ -33,9 +22,8 @@ uses
   Generics.Collections,
   ZAbstractConnection,
   ZConnection,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
   TDriverZeosTransaction = class(TDriverTransaction)
@@ -43,7 +31,7 @@ type
     FConnection: TZConnection;
     {$IFDEF ZEOS80UP}
     FTransaction: TZTransaction;
-	{$ENDIF}
+    {$ENDIF}
   public
     constructor Create(const AConnection: TComponent); override;
     destructor Destroy; override;
@@ -59,12 +47,12 @@ implementation
 
 constructor TDriverZeosTransaction.Create(const AConnection: TComponent);
 begin
-  FTransactionList := TDictionary<String, TComponent>.Create;
+  inherited;
   FConnection := AConnection as TZConnection;
   {$IFDEF ZEOS80UP}
   if FConnection.Transaction = nil then
   begin
-    FTransaction := TFDTransaction.Create(nil);
+    FTransaction := TZTransaction.Create(nil);
     FTransaction.Connection := FConnection;
     FConnection.Transaction := FTransaction;
   end;
@@ -83,10 +71,9 @@ begin
     FTransaction.Connection := nil;
     FTransaction.Free;
   end;
-  {$ENDIF}
   FTransactionActive := nil;
-  FTransactionList.Clear;
-  FTransactionList.Free;
+  {$ENDIF}
+  FConnection := nil;
   inherited;
 end;
 

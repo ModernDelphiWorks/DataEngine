@@ -1,27 +1,14 @@
 ﻿{
-                          Apache License
-                      Version 2.0, January 2004
-                   http://www.apache.org/licenses/
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-       Licensed under the Apache License, Version 2.0 (the "License");
-       you may not use this file except in compliance with the License.
-       You may obtain a copy of the License at
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-             http://www.apache.org/licenses/LICENSE-2.0
-
-       Unless required by applicable law or agreed to in writing, software
-       distributed under the License is distributed on an "AS IS" BASIS,
-       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-       See the License for the specific language governing permissions and
-       limitations under the License.
-}
-
-{
-  @abstract(DBEngine4D: Database Engine Framework for Delphi)
-  @description(A flexible and modular database engine framework for Delphi applications)
-  @created(03 Abr 2025)
-  @author(Isaque Pinheiro <isaquepsp@gmail.com>)
-  @Discord(https://discord.gg/T2zJC8zX)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 {$ifdef fpc}
@@ -40,8 +27,8 @@ uses
   Variants,
   SyncObjs,
   Generics.Collections,
-  DBEngine.Consts,
-  DBEngine.FactoryInterfaces;
+  Consts,
+  FactoryInterfaces;
 
 type
   TDriverTransaction = class;
@@ -72,7 +59,7 @@ type
     function RowsAffected: UInt32; virtual;
     function GetDriver: TDBEngineDriver; virtual;
     function MonitorCallback: TMonitorProc; virtual;
-    function Options: IOptions; virtual; abstract;
+    function Options: IOptions; virtual;
   end;
 
   TDriverTransaction = class abstract(TInterfacedObject, IDBTransaction)
@@ -1223,6 +1210,11 @@ begin
   Result := FMonitorCallback;
 end;
 
+function TDriverConnection.Options: IOptions;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['Options', Self.ClassName]);
+end;
+
 function TDriverConnection.CreateQuery: IDBQuery;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateQuery', Self.ClassName]);
@@ -1287,13 +1279,20 @@ end;
 constructor TDriverTransaction.Create(const AConnection: TComponent);
 begin
   FLock := TCriticalSection.Create;
+  // Usamos TDictionary simples. A responsabilidade de liberar os objetos de transação
+  // (TComponent) é do seu Owner (DataModule/Form) ou de quem os criou, evitando Access Violation.
   FTransactionList := TDictionary<String, TComponent>.Create;
 end;
 
 destructor TDriverTransaction.Destroy;
 begin
-  FTransactionActive := nil;
-  FTransactionList.Clear;
+  FLock.Enter;
+  try
+    FTransactionActive := nil;
+    FTransactionList.Clear;
+  finally
+    FLock.Leave;
+  end;
   FTransactionList.Free;
   FLock.Free;
   inherited;
@@ -1321,7 +1320,12 @@ end;
 
 function TDriverTransaction.TransactionActive: TComponent;
 begin
-  Result := FTransactionActive;
+  FLock.Enter;
+  try
+    Result := FTransactionActive;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 procedure TDriverTransaction.UseTransaction(const AKey: String);

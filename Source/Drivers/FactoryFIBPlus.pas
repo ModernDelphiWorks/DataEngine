@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit FactoryFIBPlus;
@@ -31,21 +20,19 @@ uses
   Classes,
   SysUtils,
   FIBDatabase,
-  // DBE
-  DBE.FactoryConnection,
-  DBE.FactoryInterfaces;
+  FactoryConnection,
+  FactoryInterfaces;
 
 type
-  // Fábrica de conexão concreta com FIBPlus
   TFactoryFIBPlus = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TFIBDatabase;
-      const ADriverName: TDriverName); overload;
+      const ADriverName: TDBEngineDriver); overload;
     constructor Create(const AConnection: TFIBDatabase;
-      const ADriverName: TDriverName;
+      const ADriverName: TDBEngineDriver;
       const AMonitor: ICommandMonitor); overload;
     constructor Create(const AConnection: TFIBDatabase;
-      const ADriverName: TDriverName;
+      const ADriverName: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -54,28 +41,27 @@ type
 implementation
 
 uses
-  dbe.driver.fibplus,
-  dbe.driver.fibplus.transaction;
+  DriverFIBPlus,
+  DriverFIBPlusTransaction;
 
 { TFactoryFIBPlus }
 
 constructor TFactoryFIBPlus.Create(const AConnection: TFIBDatabase;
-  const ADriverName: TDriverName);
+  const ADriverName: TDBEngineDriver);
 begin
   FDriverTransaction := TDriverFIBPlusTransaction.Create(AConnection);
   FDriverConnection  := TDriverFIBPlus.Create(AConnection,
                                               FDriverTransaction,
                                               ADriverName,
-                                              FCommandMonitor,
                                               FMonitorCallback);
   FAutoTransaction := False;
 end;
 
-constructor TFactoryUniDAC.Create(const AConnection: TFIBDatabase;
-  const ADriverName: TDriverName; const AMonitor: ICommandMonitor);
+constructor TFactoryFIBPlus.Create(const AConnection: TFIBDatabase;
+  const ADriverName: TDBEngineDriver; const AMonitor: ICommandMonitor);
 begin
-  Create(AConnection, ADriverName);
   FCommandMonitor := AMonitor;
+  Create(AConnection, ADriverName);
 end;
 
 procedure TFactoryFIBPlus.AddTransaction(const AKey: String;
@@ -88,10 +74,10 @@ begin
 end;
 
 constructor TFactoryFIBPlus.Create(const AConnection: TFIBDatabase;
-  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
+  const ADriverName: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
 begin
-  Create(AConnection, ADriverName);
   FMonitorCallback := AMonitorCallback;
+  Create(AConnection, ADriverName);
 end;
 
 destructor TFactoryFIBPlus.Destroy;

@@ -1,29 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{
-  @abstract(DBE Framework)
-  @created(25 julho 2017)
-  @author(Marcos J O Nielsen <marcos@softniels.com.br>)
-  @author(Skype : marcos@softniels.com.br)
-
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverUniDac;
@@ -42,11 +27,11 @@ uses
   UniProvider,
   UniScript,
   // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com UniDAC
+  // Classe de conexï¿½o concreta com UniDAC
   TDriverUniDAC = class(TDriverConnection)
   private
     function _GetTransactionActive: TUniTransaction;
@@ -56,8 +41,7 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDriverName;
-      const AMonitor: ICommandMonitor;
+      const ADriverName: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
@@ -67,10 +51,10 @@ type
     procedure ExecuteScript(const AScript: String); override;
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
-    procedure ApplyUpdates(const ADataSets: array of IDBResultSet); override;
+    procedure ApplyUpdates(const ADataSets: array of IDBDataSet); override;
     function IsConnected: Boolean; override;
     function CreateQuery: IDBQuery; override;
-    function CreateDataSet(const ASQL: String = ''): IDBResultSet; override;
+    function CreateDataSet(const ASQL: String = ''): IDBDataSet; override;
     function GetSQLScripts: String; override;
   end;
 
@@ -84,15 +68,14 @@ type
   public
     constructor Create(const AConnection: TUniConnection;
       const ADriverTransaction: TDriverTransaction;
-      const AMonitor: ICommandMonitor;
       const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
     function RowsAffected: UInt32; override;
   end;
 
-  TDriverResultSetUniDAC = class(TDriverResultSet<TUniQuery>)
+  TDriverDataSetUniDAC = class(TDriverDataSet<TUniQuery>)
   protected
     procedure _SetUniDirectional(const Value: Boolean); override;
     procedure _SetReadOnly(const Value: Boolean); override;
@@ -100,17 +83,11 @@ type
     procedure _SetCommandText(const ACommandText: String); override;
     function _GetCommandText: String; override;
   public
-    constructor Create(const ADataSet: TUniQuery; const AMonitor: ICommandMonitor;
-      const AMonitorCallback: TMonitorProc); reintroduce;
+    constructor Create(const ADataSet: TUniQuery; const AMonitorCallback: TMonitorProc); reintroduce;
     destructor Destroy; override;
     procedure Open; override;
     procedure ApplyUpdates; override;
     procedure CancelUpdates; override;
-    function NotEof: Boolean; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; overload; override;
-    function GetField(const AFieldName: String): TField; override;
     function RowsAffected: UInt32; override;
     function IsUniDirectional: Boolean; override;
     function IsReadOnly: Boolean; override;
@@ -123,14 +100,12 @@ implementation
 
 constructor TDriverUniDAC.Create(const AConnection: TComponent;
   const ADriverTransaction: TDriverTransaction;
-  const ADriverName: TDriverName;
-  const AMonitor: ICommandMonitor;
+  const ADriverName: TDBEngineDriver;
   const AMonitorCallback: TMonitorProc);
 begin
   FConnection := AConnection as TUniConnection;
   FDriverTransaction := ADriverTransaction;
-  FDriverName := ADriverName;
-  FCommandMonitor := AMonitor;
+  FDriver := ADriverName;
   FMonitorCallback := AMonitorCallback;
   FSQLScript  := TUniScript.Create(nil);
   try
@@ -159,17 +134,33 @@ procedure TDriverUniDAC.ExecuteDirect(const ASQL: String);
 var
   LExeSQL: TUniSQL;
 begin
+  if not Assigned(FConnection) then
+    raise Exception.Create('Connection not assigned.');
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+  if ASQL = '' then
+    raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
   LExeSQL := TUniSQL.Create(nil);
   try
     LExeSQL.Connection := FConnection;
     LExeSQL.Transaction := _GetTransactionActive;
     LExeSQL.SQL.Text := ASQL;
-    if not LExeSQL.Prepared then
-      LExeSQL.Prepare;
-    LExeSQL.Execute;
+    
+    try
+      if not LExeSQL.Prepared then
+        LExeSQL.Prepare;
+      LExeSQL.Execute;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+    end;
   finally
     _SetMonitorLog(LExeSQL.SQL.Text, LExeSQL.Transaction.Name, LExeSQL.Params);
-    FRowsAffected := LExeSQL.RowsAffected;
     LExeSQL.Free;
   end;
 end;
@@ -179,6 +170,13 @@ var
   LExeSQL: TUniSQL;
   LFor: Int16;
 begin
+  if not Assigned(FConnection) then
+    raise Exception.Create('Connection not assigned.');
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+  if ASQL = '' then
+    raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
   LExeSQL := TUniSQL.Create(nil);
   try
     LExeSQL.Connection := FConnection;
@@ -189,12 +187,21 @@ begin
       LExeSQL.ParamByName(AParams[LFor].Name).DataType := AParams[LFor].DataType;
       LExeSQL.ParamByName(AParams[LFor].Name).Value := AParams[LFor].Value;
     end;
-    if not LExeSQL.Prepared then
-      LExeSQL.Prepare;
-    LExeSQL.Execute;
+    
+    try
+      if not LExeSQL.Prepared then
+        LExeSQL.Prepare;
+      LExeSQL.Execute;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(ASQL, E.Message, LExeSQL.Params);
+        raise;
+      end;
+    end;
   finally
     _SetMonitorLog(LExeSQL.SQL.Text, LExeSQL.Transaction.Name, LExeSQL.Params);
-    FRowsAffected := LExeSQL.RowsAffected;
     LExeSQL.Free;
   end;
 end;
@@ -208,13 +215,25 @@ end;
 procedure TDriverUniDAC.ExecuteScripts;
 begin
   if FSQLScript.SQL.Count = 0 then
-    Exit;
+    raise Exception.Create('No SQL scripts found to execute.');
+
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
   try
     FSQLScript.Transaction := _GetTransactionActive;
-    FSQLScript.Execute;
+    try
+      FSQLScript.Execute;
+      FRowsAffected := FSQLScript.RowsAffected;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog('Error during script execution', E.Message, nil);
+        raise;
+      end;
+    end;
   finally
     _SetMonitorLog(FSQLScript.SQL.Text, FSQLScript.Transaction.Name, nil);
-    FRowsAffected := FSQLScript.RowsAffected;
     FSQLScript.SQL.Clear;
   end;
 end;
@@ -226,15 +245,15 @@ end;
 
 procedure TDriverUniDAC.AddScript(const AScript: String);
 begin
-  if Self.GetDriverName in [dnInterbase, dnFirebird, dnFirebird3] then
+  if Self.GetDriver in [dnInterbase, dnFirebird, dnFirebird3] then
     if FSQLScript.SQL.Count = 0 then
       FSQLScript.SQL.Add('SET AUTOCOMMIT OFF');
   FSQLScript.SQL.Add(AScript);
 end;
 
-procedure TDriverUniDAC.ApplyUpdates(const ADataSets: array of IDBResultSet);
+procedure TDriverUniDAC.ApplyUpdates(const ADataSets: array of IDBDataSet);
 var
-  LDataSet: IDBResultSet;
+  LDataSet: IDBDataSet;
 begin
   for LDataset in AdataSets do
     LDataset.ApplyUpdates;
@@ -259,17 +278,15 @@ function TDriverUniDAC.CreateQuery: IDBQuery;
 begin
   Result := TDriverQueryUniDAC.Create(FConnection,
                                       FDriverTransaction,
-                                      FCommandMonitor,
                                       FMonitorCallback);
 end;
 
-function TDriverUniDAC.CreateDataSet(const ASQL: String): IDBResultSet;
+function TDriverUniDAC.CreateDataSet(const ASQL: String): IDBDataSet;
 var
   LDBQuery: IDBQuery;
 begin
   LDBQuery := TDriverQueryUniDAC.Create(FConnection,
                                         FDriverTransaction,
-                                        FCommandMonitor,
                                         FMonitorCallback);
   LDBQuery.CommandText := ASQL;
   Result := LDBQuery.ExecuteQuery;
@@ -279,13 +296,14 @@ end;
 
 constructor TDriverQueryUniDAC.Create(const AConnection: TUniConnection;
   const ADriverTransaction: TDriverTransaction;
-  const AMonitor: ICommandMonitor;
   const AMonitorCallback: TMonitorProc);
 begin
   if AConnection = nil then
-    Exit;
+    raise Exception.Create('AConnection cannot be nil');
+  if ADriverTransaction = nil then
+    raise Exception.Create('ADriverTransaction cannot be nil');
+
   FDriverTransaction := ADriverTransaction;
-  FCommandMonitor := AMonitor;
   FMonitorCallback := AMonitorCallback;
   FSQLQuery := TUniSQL.Create(nil);
   try
@@ -302,40 +320,53 @@ begin
   inherited;
 end;
 
-function TDriverQueryUniDAC.ExecuteQuery: IDBResultSet;
+function TDriverQueryUniDAC.ExecuteQuery: IDBDataSet;
 var
   LResultSet: TUniQuery;
   LFor : Int16;
 begin
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
   LResultSet := TUniQuery.Create(nil);
   try
     LResultSet.Connection := FSQLQuery.Connection;
     LResultSet.Transaction := _GetTransactionActive;
     LResultSet.SQL.Text := FSQLQuery.SQL.Text;
+    
+    if LResultSet.SQL.Text = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
     try
       for LFor := 0 to FSQLQuery.Params.Count - 1 do
       begin
         LResultSet.Params[LFor].DataType := FSQLQuery.Params[LFor].DataType;
         LResultSet.Params[LFor].Value := FSQLQuery.Params[LFor].Value;
       end;
-      if LResultSet.SQL.Text <> EmptyStr then
-      begin
-        if not LResultSet.Prepared then
-          LResultSet.Prepare;
-        LResultSet.Open;
-      end;
-      Result := TDriverResultSetUniDAC.Create(LResultSet, FCommandMonitor, FMonitorCallback);
+      
+      if not LResultSet.Prepared then
+        LResultSet.Prepare;
+      LResultSet.Open;
+      
+      Result := TDriverDataSetUniDAC.Create(LResultSet, FMonitorCallback);
       if LResultSet.Active then
       begin
         if LResultSet.RecordCount = 0 then
           Result.FetchingAll := True;
       end;
-    finally
-      if LResultSet.SQL.Text <> EmptyStr then
-        _SetMonitorLog(LResultSet.SQL.Text, LResultSet.Transaction.Name, LResultSet.Params);
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(LResultSet.SQL.Text, E.Message, LResultSet.Params);
+        raise;
+      end;
     end;
+  finally
+    if LResultSet.SQL.Text <> EmptyStr then
+      _SetMonitorLog(LResultSet.SQL.Text, LResultSet.Transaction.Name, LResultSet.Params);
+  end;
   except
-    if Assigned(LResultSet) then
+    if Assigned(LResultSet) and (Result = nil) then
       LResultSet.Free;
     raise;
   end;
@@ -366,6 +397,12 @@ var
   LExeSQL: TUniSQL;
   LFor: Int16;
 begin
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
+  if FSQLQuery.SQL.Text = '' then
+    raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
   LExeSQL := TUniSQL.Create(nil);
   try
     LExeSQL.Connection := FSQLQuery.Connection;
@@ -376,94 +413,64 @@ begin
       LExeSQL.Params[LFor].DataType := FSQLQuery.Params[LFor].DataType;
       LExeSQL.Params[LFor].Value := FSQLQuery.Params[LFor].Value;
     end;
-    if not LExeSQL.Prepared then
-      LExeSQL.Prepare;
-    LExeSQL.Execute;
+    
+    try
+      if not LExeSQL.Prepared then
+        LExeSQL.Prepare;
+      LExeSQL.Execute;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(LExeSQL.SQL.Text, E.Message, LExeSQL.Params);
+        raise;
+      end;
+    end;
   finally
     _SetMonitorLog(LExeSQL.SQL.Text, LExeSQL.Transaction.Name, LExeSQL.Params);
-    FRowsAffected := LExeSQL.RowsAffected;
     LExeSQL.Free;
   end;
 end;
 
-{ TDriverResultSetUniDAC }
+{ TDriverDataSetUniDAC }
 
-procedure TDriverResultSetUniDAC.ApplyUpdates;
+constructor TDriverDataSetUniDAC.Create(const ADataSet: TUniQuery;
+      const AMonitorCallback: TMonitorProc);
+begin
+  inherited Create(ADataSet, AMonitorCallback);
+end;
+
+destructor TDriverDataSetUniDAC.Destroy;
+begin
+  inherited;
+end;
+
+procedure TDriverDataSetUniDAC.ApplyUpdates;
 begin
   FDataSet.ApplyUpdates;
 end;
 
-procedure TDriverResultSetUniDAC.CancelUpdates;
+procedure TDriverDataSetUniDAC.CancelUpdates;
 begin
   FDataSet.CancelUpdates;
 end;
 
-constructor TDriverResultSetUniDAC.Create(const ADataSet: TUniQuery; const AMonitor: ICommandMonitor;
-      const AMonitorCallback: TMonitorProc);
-begin
-  inherited Create(ADataSet, AMonitor, AMonitorCallback);
-end;
-
-destructor TDriverResultSetUniDAC.Destroy;
-begin
-  FDataSet.Free;
-  inherited;
-end;
-
-function TDriverResultSetUniDAC.GetFieldValue(const AFieldName: String): Variant;
-var
-  LField: TField;
-begin
-  LField := FDataSet.FieldByName(AFieldName);
-  Result := GetFieldValue(LField.Index);
-end;
-
-function TDriverResultSetUniDAC.GetField(const AFieldName: String): TField;
-begin
-  Result := FDataSet.FieldByName(AFieldName);
-end;
-
-function TDriverResultSetUniDAC.GetFieldType(const AFieldName: String): TFieldType;
-begin
-  Result := FDataSet.FieldByName(AFieldName).DataType;
-end;
-
-function TDriverResultSetUniDAC.GetFieldValue(const AFieldIndex: UInt16): Variant;
-begin
-  if AFieldIndex > FDataSet.FieldCount - 1 then
-    Exit(Variants.Null);
-
-  if FDataSet.Fields[AFieldIndex].IsNull then
-    Result := Variants.Null
-  else
-    Result := FDataSet.Fields[AFieldIndex].Value;
-end;
-
-function TDriverResultSetUniDAC.IsCachedUpdates: Boolean;
+function TDriverDataSetUniDAC.IsCachedUpdates: Boolean;
 begin
   Result := FDataSet.CachedUpdates;
 end;
 
-function TDriverResultSetUniDAC.IsReadOnly: Boolean;
+function TDriverDataSetUniDAC.IsReadOnly: Boolean;
 begin
   Result := FDataSet.ReadOnly;
 end;
 
-function TDriverResultSetUniDAC.IsUniDirectional: Boolean;
+function TDriverDataSetUniDAC.IsUniDirectional: Boolean;
 begin
   Result := FDataSet.UniDirectional;
 end;
 
-function TDriverResultSetUniDAC.NotEof: Boolean;
-begin
-  if not FFirstNext then
-    FFirstNext := True
-  else
-    FDataSet.Next;
-  Result := not FDataSet.Eof;
-end;
-
-procedure TDriverResultSetUniDAC.Open;
+procedure TDriverDataSetUniDAC.Open;
 begin
   try
     inherited Open;
@@ -472,35 +479,34 @@ begin
   end;
 end;
 
-function TDriverResultSetUniDAC.RowsAffected: UInt32;
+function TDriverDataSetUniDAC.RowsAffected: UInt32;
 begin
   Result := FDataSet.RowsAffected;
 end;
 
-function TDriverResultSetUniDAC._GetCommandText: String;
+function TDriverDataSetUniDAC._GetCommandText: String;
 begin
   Result := FDataSet.SQL.Text;
 end;
 
-procedure TDriverResultSetUniDAC._SetCachedUpdates(const Value: Boolean);
+procedure TDriverDataSetUniDAC._SetCachedUpdates(const Value: Boolean);
 begin
   FDataSet.CachedUpdates := Value;
 end;
 
-procedure TDriverResultSetUniDAC._SetCommandText(const ACommandText: String);
+procedure TDriverDataSetUniDAC._SetCommandText(const ACommandText: String);
 begin
   FDataSet.SQL.Text := ACommandText;
 end;
 
-procedure TDriverResultSetUniDAC._SetReadOnly(const Value: Boolean);
+procedure TDriverDataSetUniDAC._SetReadOnly(const Value: Boolean);
 begin
   FDataSet.ReadOnly := Value;
 end;
 
-procedure TDriverResultSetUniDAC._SetUniDirectional(const Value: Boolean);
+procedure TDriverDataSetUniDAC._SetUniDirectional(const Value: Boolean);
 begin
   FDataSet.UniDirectional := Value;
 end;
 
 end.
-

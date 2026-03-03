@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverWireMongoDB;
@@ -27,21 +16,19 @@ unit DriverWireMongoDB;
 interface
 
 uses
-  DB,
-  Classes,
-  SysUtils,
-  DBClient,
-  Variants,
-  StrUtils,
-  Math,
-  /// MongoDB
-  mongoWire,
+  System.Classes,
+  System.SysUtils,
+  System.Variants,
+  System.StrUtils,
+  System.Math,
+  Data.DB,
+  Datasnap.DBClient,
+  MongoWire,
   bsonTools,
   JsonDoc,
   MongoWireConnection,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
   TMongoDBQuery = class(TCustomClientDataSet)
@@ -57,53 +44,51 @@ type
     property Collection: String read FCollection write FCollection;
   end;
 
-  // Classe de conexão concreta com dbExpress
-  TDriverMongoWire = class(TDriverConnection)
+  TDriverWireMongoDB = class(TDriverConnection)
   protected
     FConnection: TMongoWireConnection;
-//    FScripts: TStrings;
     procedure CommandUpdateExecute(const ACommandText: String; const AParams: TParams);
     procedure CommandInsertExecute(const ACommandText: String; const AParams: TParams);
     procedure CommandDeleteExecute(const ACommandText: String; const AParams: TParams);
   public
-    constructor Create(const AConnection: TComponent; const ADriverName: TDriverName); override;
+    constructor Create(const AConnection: TComponent;
+      const ADriverTransaction: TDriverTransaction;
+      const ADriverName: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
     procedure ExecuteDirect(const ASQL: String); override;
-    procedure ExecuteDirect(const ASQL: String; const AParams: TParams); override;
+    procedure ExecuteDirect(const ASQL: String;
+      const AParams: TParams); override;
     procedure ExecuteScript(const AScript: String); override;
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
     function IsConnected: Boolean; override;
-    function InTransaction: Boolean; override;
     function CreateQuery: IDBQuery; override;
     function CreateDataSet(const ASQL: String): IDBResultSet; override;
   end;
 
-  TDriverQueryMongoWire = class(TDriverQuery)
+  TDriverQueryWireMongoDB = class(TDriverQuery)
   private
     FConnection: TMongoWireConnection;
     FCommandText: String;
   protected
-    procedure SetCommandText(ACommandText: String); override;
-    function GetCommandText: String; override;
+    procedure _SetCommandText(const ACommandText: String); override;
+    function _GetCommandText: String; override;
   public
-    constructor Create(AConnection: TMongoWireConnection);
+    constructor Create(const AConnection: TMongoWireConnection;
+      const ADriverTransaction: TDriverTransaction;
+      const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
+    function RowsAffected: UInt32; override;
   end;
 
-  TDriverResultSetMongoWire = class(TDriverResultSet<TMongoDBQuery>)
+  TDriverResultSetWireMongoDB = class(TDriverDataSet<TMongoDBQuery>)
   public
-    constructor Create(ADataSet: TMongoDBQuery); override;
-    destructor Destroy; override;
-    function NotEof: Boolean; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; overload; override;
-    function GetField(const AFieldName: String): TField; override;
+    constructor Create(const ADataSet: TMongoDBQuery; const AMonitorCallback: TMonitorProc); reintroduce;
   end;
 
 implementation
@@ -116,88 +101,94 @@ uses
   ormbr.mapping.rttiutils,
   ormbr.objects.helper;
 
-{ TDriverMongoWire }
+{ TDriverWireMongoDB }
 
-constructor TDriverMongoWire.Create(const AConnection: TComponent; const ADriverName: TDriverName);
+constructor TDriverWireMongoDB.Create(const AConnection: TComponent;
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc);
 begin
   inherited;
   FConnection := AConnection as TMongoWireConnection;
-  FDriverName := ADriverName;
-//  FScripts := TStrings.Create;
+  FDriverTransaction := ADriverTransaction;
+  FDriver := ADriverName;
+  FMonitorCallback := AMonitorCallback;
 end;
 
-destructor TDriverMongoWire.Destroy;
+destructor TDriverWireMongoDB.Destroy;
 begin
-//  FScripts.Free;
   FConnection := nil;
   inherited;
 end;
 
-procedure TDriverMongoWire.Disconnect;
+procedure TDriverWireMongoDB.Connect;
 begin
-  inherited;
+  FConnection.Connected := True;
+end;
+
+procedure TDriverWireMongoDB.Disconnect;
+begin
   FConnection.Connected := False;
 end;
 
-procedure TDriverMongoWire.ExecuteDirect(const ASQL: String);
+function TDriverWireMongoDB.IsConnected: Boolean;
 begin
-  inherited;
+  Result := FConnection.Connected;
+end;
+
+procedure TDriverWireMongoDB.ExecuteDirect(const ASQL: String);
+begin
   try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
     FConnection.RunCommand(ASQL);
+    _SetMonitorLog(ASQL, '', nil);
   except
     on E: Exception do
+    begin
+      _SetMonitorLog(ASQL, E.Message, nil);
       raise Exception.Create(E.Message);
+    end;
   end;
 end;
 
-procedure TDriverMongoWire.ExecuteDirect(const ASQL: String; const AParams: TParams);
+procedure TDriverWireMongoDB.ExecuteDirect(const ASQL: String;
+  const AParams: TParams);
 var
   LCommand: String;
 begin
-  LCommand := TUtilSingleton
-                .GetInstance
-                  .ParseCommandNoSQL('command', ASQL);
-  if LCommand = 'insert' then
-    CommandInsertExecute(ASQL, Aparams)
-  else
-  if LCommand = 'update' then
-    CommandUpdateExecute(ASQL, AParams)
-  else
-  if LCommand = 'delete' then
-    CommandDeleteExecute(ASQL, AParams);
-end;
-
-procedure TDriverMongoWire.ExecuteScript(const AScript: String);
-begin
-  inherited;
   try
-    FConnection.RunCommand(AScript);
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    LCommand := TUtilSingleton
+                  .GetInstance
+                    .ParseCommandNoSQL('command', ASQL);
+                    
+    if LCommand = 'insert' then
+      CommandInsertExecute(ASQL, AParams)
+    else if LCommand = 'update' then
+      CommandUpdateExecute(ASQL, AParams)
+    else if LCommand = 'delete' then
+      CommandDeleteExecute(ASQL, AParams)
+    else
+      FConnection.RunCommand(ASQL); // Fallback for other commands
+      
+    _SetMonitorLog(ASQL, '', AParams);
   except
     on E: Exception do
+    begin
+      _SetMonitorLog(ASQL, E.Message, nil);
       raise Exception.Create(E.Message);
+    end;
   end;
 end;
 
-procedure TDriverMongoWire.ExecuteScripts;
-//var
-//  LFor: UInt16;
-begin
-  inherited;
-//  try
-//    for LFor := 0 to FScripts.Count -1 do
-//      FConnection.RunCommand(FScripts[LFor]);
-//  finally
-//    FScripts.Clear;
-//  end;
-end;
-
-procedure TDriverMongoWire.AddScript(const AScript: String);
-begin
-  inherited;
-//  FScripts.Add(ASQL);
-end;
-
-procedure TDriverMongoWire.CommandInsertExecute(const ACommandText: String;
+procedure TDriverWireMongoDB.CommandInsertExecute(const ACommandText: String;
   const AParams: TParams);
 var
   LDoc: IJSONDocument;
@@ -214,11 +205,11 @@ begin
       .MongoWire
         .Insert(LCollection, LDoc);
   except
-    raise EMongoException.Create('MongoWire: não foi possível inserir o Documento');
+    raise EMongoException.Create('MongoWire: could not insert Document');
   end;
 end;
 
-procedure TDriverMongoWire.CommandUpdateExecute(const ACommandText: String;
+procedure TDriverWireMongoDB.CommandUpdateExecute(const ACommandText: String;
   const AParams: TParams);
 var
   LDocQuery: IJSONDocument;
@@ -239,11 +230,11 @@ begin
       .MongoWire
         .Update(LCollection, LDocFilter, LDocQuery);
   except
-    raise EMongoException.Create('MongoWire: não foi possível alterar o Documento');
+    raise EMongoException.Create('MongoWire: could not update Document');
   end;
 end;
 
-procedure TDriverMongoWire.CommandDeleteExecute(const ACommandText: String;
+procedure TDriverWireMongoDB.CommandDeleteExecute(const ACommandText: String;
   const AParams: TParams);
 var
   LDoc: IJSONDocument;
@@ -260,160 +251,155 @@ begin
       .MongoWire
         .Delete(LCollection, LDoc);
   except
-    raise EMongoException.Create('MongoWire: não foi possível remover o Documento');
+    raise EMongoException.Create('MongoWire: could not delete Document');
   end;
 end;
 
-procedure TDriverMongoWire.Connect;
+procedure TDriverWireMongoDB.ExecuteScript(const AScript: String);
 begin
-  inherited;
-  FConnection.Connected := True;
+  try
+    FConnection.RunCommand(AScript);
+    _SetMonitorLog(AScript, '', nil);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog(AScript, E.Message, nil);
+      raise Exception.Create(E.Message);
+    end;
+  end;
 end;
 
-function TDriverMongoWire.InTransaction: Boolean;
+procedure TDriverWireMongoDB.AddScript(const AScript: String);
 begin
-  Result := False;
+  // Not implemented in original, keeping consistent
 end;
 
-function TDriverMongoWire.IsConnected: Boolean;
+procedure TDriverWireMongoDB.ExecuteScripts;
 begin
-  inherited;
-  Result := FConnection.Connected = True;
+  // Not implemented in original, keeping consistent
 end;
 
-function TDriverMongoWire.CreateQuery: IDBQuery;
+function TDriverWireMongoDB.CreateQuery: IDBQuery;
 begin
-  Result := TDriverQueryMongoWire.Create(FConnection);
+  Result := TDriverQueryWireMongoDB.Create(FConnection, FDriverTransaction, FMonitorCallback);
 end;
 
-function TDriverMongoWire.CreateDataSet(const ASQL: String): IDBResultSet;
+function TDriverWireMongoDB.CreateDataSet(const ASQL: String): IDBResultSet;
 var
   LDBQuery: IDBQuery;
 begin
-  LDBQuery := TDriverQueryMongoWire.Create(FConnection);
+  LDBQuery := TDriverQueryWireMongoDB.Create(FConnection, FDriverTransaction, FMonitorCallback);
   LDBQuery.CommandText := ASQL;
   Result := LDBQuery.ExecuteQuery;
 end;
 
-{ TDriverDBExpressQuery }
+{ TDriverQueryWireMongoDB }
 
-constructor TDriverQueryMongoWire.Create(AConnection: TMongoWireConnection);
+constructor TDriverQueryWireMongoDB.Create(const AConnection: TMongoWireConnection;
+  const ADriverTransaction: TDriverTransaction;
+  const AMonitorCallback: TMonitorProc);
 begin
+  if AConnection = nil then
+    raise Exception.Create('AConnection cannot be nil');
+
   FConnection := AConnection;
+  FDriverTransaction := ADriverTransaction;
+  FMonitorCallback := AMonitorCallback;
 end;
 
-destructor TDriverQueryMongoWire.Destroy;
+destructor TDriverQueryWireMongoDB.Destroy;
 begin
   inherited;
 end;
 
-function TDriverQueryMongoWire.ExecuteQuery: IDBResultSet;
+function TDriverQueryWireMongoDB._GetCommandText: String;
+begin
+  Result := FCommandText;
+end;
+
+procedure TDriverQueryWireMongoDB._SetCommandText(const ACommandText: String);
+begin
+  FCommandText := ACommandText;
+end;
+
+procedure TDriverQueryWireMongoDB.ExecuteDirect;
+begin
+  try
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    FConnection.RunCommand(FCommandText);
+    _SetMonitorLog(FCommandText, '', nil);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog(FCommandText, E.Message, nil);
+      raise Exception.Create(E.Message);
+    end;
+  end;
+end;
+
+function TDriverQueryWireMongoDB.ExecuteQuery: IDBResultSet;
 var
   LUtil: IUtilSingleton;
   LResultSet: TMongoDBQuery;
   LObject: TObject;
 begin
+  if FDriverTransaction.TransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
   LUtil := TUtilSingleton.GetInstance;
   LResultSet := TMongoDBQuery.Create(nil);
-  LResultSet.SetConnection(FConnection);
-  LResultSet.Collection := LUTil.ParseCommandNoSQL('collection', FCommandText);
-  LObject :=  TMappingExplorer
-                .GetInstance
-                  .Repository
-                    .FindEntityByName('T' + LResultSet.Collection).Create;
-  TBind.Instance
-       .SetInternalInitFieldDefsObjectClass(LResultSet, LObject);
-  LResultSet.CreateDataSet;
-  LResultSet.LogChanges := False;
+  LObject := nil;
+  
   try
+    LResultSet.SetConnection(FConnection);
+    LResultSet.Collection := LUTil.ParseCommandNoSQL('collection', FCommandText);
+    
+    // Using ORMBr mapping to create fields definition
+    LObject := TMappingExplorer
+                 .GetInstance
+                   .Repository
+                     .FindEntityByName('T' + LResultSet.Collection).Create;
+                     
+    TBind.Instance
+         .SetInternalInitFieldDefsObjectClass(LResultSet, LObject);
+         
+    LResultSet.CreateDataSet;
+    LResultSet.LogChanges := False;
+    
     try
       LResultSet.Find(FCommandText);
+      _SetMonitorLog(FCommandText, '', nil);
     except
       on E: Exception do
       begin
+        _SetMonitorLog(FCommandText, E.Message, nil);
         LResultSet.Free;
         raise Exception.Create(E.Message);
       end;
     end;
-    Result := TDriverResultSetMongoWire.Create(LResultSet);
+    
+    Result := TDriverResultSetWireMongoDB.Create(LResultSet, FMonitorCallback);
     if LResultSet.RecordCount = 0 then
        Result.FetchingAll := True;
   finally
-    LObject.Free;
+    if Assigned(LObject) then
+      LObject.Free;
   end;
 end;
 
-function TDriverQueryMongoWire.GetCommandText: String;
+function TDriverQueryWireMongoDB.RowsAffected: UInt32;
 begin
-  Result := FCommandText;
+  Result := FRowsAffected;
 end;
 
-procedure TDriverQueryMongoWire.SetCommandText(ACommandText: String);
+{ TDriverResultSetWireMongoDB }
+
+constructor TDriverResultSetWireMongoDB.Create(const ADataSet: TMongoDBQuery;
+  const AMonitorCallback: TMonitorProc);
 begin
-  inherited;
-  FCommandText := ACommandText;
-end;
-
-procedure TDriverQueryMongoWire.ExecuteDirect;
-begin
-  try
-    FConnection.RunCommand(FCommandText);
-  except
-    on E: Exception do
-      raise Exception.Create(E.Message);
-  end;
-end;
-
-{ TDriverResultSetMongoWire }
-
-constructor TDriverResultSetMongoWire.Create(ADataSet: TMongoDBQuery);
-begin
-  FDataSet := ADataSet;
-  inherited;
-end;
-
-destructor TDriverResultSetMongoWire.Destroy;
-begin
-  FDataSet.Free;
-  inherited;
-end;
-
-function TDriverResultSetMongoWire.GetFieldValue(const AFieldName: String): Variant;
-var
-  LField: TField;
-begin
-  LField := FDataSet.FieldByName(AFieldName);
-  Result := GetFieldValue(LField.Index);
-end;
-
-function TDriverResultSetMongoWire.GetField(const AFieldName: String): TField;
-begin
-  Result := FDataSet.FieldByName(AFieldName);
-end;
-
-function TDriverResultSetMongoWire.GetFieldType(const AFieldName: String): TFieldType;
-begin
-  Result := FDataSet.FieldByName(AFieldName).DataType;
-end;
-
-function TDriverResultSetMongoWire.GetFieldValue(const AFieldIndex: UInt16): Variant;
-begin
-  if AFieldIndex > FDataSet.FieldCount - 1 then
-    Exit(Variants.Null);
-
-  if FDataSet.Fields[AFieldIndex].IsNull then
-    Result := Variants.Null
-  else
-    Result := FDataSet.Fields[AFieldIndex].Value;
-end;
-
-function TDriverResultSetMongoWire.NotEof: Boolean;
-begin
-  if not FFirstNext then
-    FFirstNext := True
-  else
-    FDataSet.Next;
-  Result := not FDataSet.Eof;
+  inherited Create(ADataSet, AMonitorCallback);
 end;
 
 { TMongoDBQuery }
@@ -421,12 +407,10 @@ end;
 constructor TMongoDBQuery.Create(AOwner: TComponent);
 begin
   inherited;
-
 end;
 
 destructor TMongoDBQuery.Destroy;
 begin
-
   inherited;
 end;
 
@@ -478,73 +462,9 @@ begin
 end;
 
 function TMongoDBQuery.GetSequence(AMongoCampo: String): Int64;
-//Var
-//  LDocD, LChave, LDocR: IJSONDocument;
-//  LJsonObj: TJSONObject;
-//  LField, LComandSave, LComandModify: TStringBuilder;
-//  LCollectionSeq, sCollectionField: String;
-//  LRetorno: Int64;
 begin
-//  LField := TStringBuilder.Create;
-//  LComandSave := TStringBuilder.Create;
-//  LComandModify := TStringBuilder.Create;
-//  LJsonObj := TJSONObject.Create;
-//  try
-//    LComandSave.clear;
-//    LComandModify.clear;
-//    LField.clear;
-//    LField.Append('_id_').Append(AnsiLowerCase( AMongoCampo ));
-//
-//    LCollectionSeq := '_sequence';
-//    sCollectionField := '_id';
-//
-//    LComandSave.Append('{ findAndModify: "')
-//                .Append(LCollectionSeq)
-//                .Append('", query: { ')
-//                .Append(sCollectionField)
-//                .Append(': "')
-//                .Append(FCollection)
-//                .Append('" }, update: {')
-//                .Append(sCollectionField)
-//                .Append(': "')
-//                .Append(FCollection)
-//                .Append('", ')
-//                .Append(LField.ToString)
-//                .Append(': 0 }, upsert:True }');
-//
-//    LComandModify.Append('{ findAndModify: "')
-//                  .Append(LCollectionSeq)
-//                  .Append('", query: { ')
-//                  .Append(sCollectionField)
-//                  .Append(': "')
-//                  .Append(FCollection)
-//                  .Append('" }, update: { $inc: { ')
-//                  .Append(LField.ToString)
-//                  .Append(': 1 } }, new:True }');
-
-//    LJsonObj.AddPair(sCollectionField, TJSONString.Create(FCollection));
-//    LChave := LJsonObj.ToJSON;
-//    try
-//      LDocD := FConnection.FMongoWire.Get(LCollectionSeq, LChave);
-//      LRetorno := StrToInt64(VarToStr(LDocD[LField.ToString]));
-//    except
-//      LDocD := JsonToBson(LComandSave.ToString);
-//      LDocR := FConnection.FMongoWire.RunCommand(LDocD);
-//    end;
-//    try
-//      LDocD := JsonToBson(LComandModify.ToString);
-//      LDocR := FConnection.FMongoWire.RunCommand(LDocD);
-//      Result := StrToInt(VarToStr(BSON(LDocR['value'])[LField.ToString]));
-//    except
-//      Result := -1;
-//      raise EMongoException.Create('Mongo: não foi possível gerar o AutoIncremento.');
-//    end;
-//  finally
-//    LField.Free;
-//    LComandSave.Free;
-//    LComandModify.Free;
-//    LJsonObj.Free;
-//  end;
+  // Implementation commented out in original
+  Result := 0;
 end;
 
 procedure TMongoDBQuery.SetConnection(AConnection: TMongoWireConnection);

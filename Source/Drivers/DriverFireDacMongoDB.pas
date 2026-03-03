@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverFireDacMongoDB;
@@ -45,15 +34,13 @@ uses
   FireDAC.Phys.MongoDBDataSet, FireDAC.Comp.Client,
   FireDAC.Comp.UI,
   // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com FireDAC
   TDriverMongoFireDAC = class(TDriverConnection)
   protected
     FConnection: TFDConnection;
-//    FSQLScript : TFDMongoQuery;
     FMongoEnv: TMongoEnv;
     FMongoConnection: TMongoConnection;
     procedure CommandUpdateExecute(const ACommandText: String; const AParams: TParams);
@@ -61,7 +48,9 @@ type
     procedure CommandDeleteExecute(const ACommandText: String; const AParams: TParams);
   public
     constructor Create(const AConnection: TComponent;
-      const ADriverName: TDriverName); override;
+      const ADriverTransaction: TDriverTransaction;
+      const ADriverName: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
@@ -71,7 +60,6 @@ type
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
     function IsConnected: Boolean; override;
-    function InTransaction: Boolean; override;
     function CreateQuery: IDBQuery; override;
     function CreateDataSet(const ASQL: String): IDBResultSet; override;
   end;
@@ -83,25 +71,24 @@ type
     FMongoConnection: TMongoConnection;
     FMongoEnv: TMongoEnv;
   protected
-    procedure SetCommandText(ACommandText: String); override;
-    function GetCommandText: String; override;
+    procedure _SetCommandText(const ACommandText: String); override;
+    function _GetCommandText: String; override;
   public
-    constructor Create(AConnection: TFDConnection; AMongoConnection: TMongoConnection;
-      AMongoEnv: TMongoEnv);
+    constructor Create(const AConnection: TFDConnection;
+      const ADriverTransaction: TDriverTransaction;
+      const AMongoConnection: TMongoConnection;
+      const AMongoEnv: TMongoEnv;
+      const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
   end;
 
-  TDriverResultSetMongoFireDAC = class(TDriverResultSet<TFDMongoQuery>)
+  TDriverResultSetMongoFireDAC = class(TDriverDataSet<TFDMongoQuery>)
   public
-    constructor Create(ADataSet: TFDMongoQuery); override;
+    constructor Create(const ADataSet: TFDMongoQuery; const AMonitorCallback: TMonitorProc); reintroduce;
     destructor Destroy; override;
-    function NotEof: Boolean; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; overload; override;
-    function GetField(const AFieldName: String): TField; override;
+    function RowsAffected: UInt32; override;
   end;
 
 implementation
@@ -112,42 +99,39 @@ uses
 { TDriverMongoFireDAC }
 
 constructor TDriverMongoFireDAC.Create(const AConnection: TComponent;
-  const ADriverName: TDriverName);
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc);
 begin
   inherited;
   FConnection := AConnection as TFDConnection;
-  FDriverName := ADriverName;
-  FMongoConnection := TMongoConnection(FConnection.CliObj);
-  FMongoEnv := FMongoConnection.Env;
-
-//  FSQLScript  := TFDMongoQuery.Create(nil);
-//  try
-//    FSQLScript.Connection := FConnection;
-//    FSQLScript.DatabaseName := FConnection.Params.Database;
-//  except
-//    FSQLScript.Free;
-//    raise;
-//  end;
+  FDriverTransaction := ADriverTransaction;
+  FDriver := ADriverName;
+  FMonitorCallback := AMonitorCallback;
+  
+  if FConnection.CliObj <> nil then
+  begin
+    FMongoConnection := TMongoConnection(FConnection.CliObj);
+    if FMongoConnection <> nil then
+      FMongoEnv := FMongoConnection.Env;
+  end;
 end;
 
 destructor TDriverMongoFireDAC.Destroy;
 begin
   FConnection := nil;
-//  FSQLScript.Free;
+  FMongoConnection := nil;
+  FMongoEnv := nil;
   inherited;
 end;
 
 procedure TDriverMongoFireDAC.Disconnect;
 begin
-  inherited;
   FConnection.Connected := False;
 end;
 
 procedure TDriverMongoFireDAC.ExecuteDirect(const ASQL: String);
 begin
-  inherited;
-  raise Exception.Create('Command [ExecuteDirect()] not supported for NoSQL MongoDB database!');
-//  FConnection.ExecSQL(ASQL);
+  ExecuteDirect(ASQL, nil);
 end;
 
 procedure TDriverMongoFireDAC.ExecuteDirect(const ASQL: String;
@@ -155,49 +139,62 @@ procedure TDriverMongoFireDAC.ExecuteDirect(const ASQL: String;
 var
   LCommand: String;
 begin
-  LCommand := TUtilSingleton
-                .GetInstance
-                  .ParseCommandNoSQL('command', ASQL);
-  if LCommand = 'insert' then
-    CommandInsertExecute(ASQL, Aparams)
-  else
-  if LCommand = 'update' then
-    CommandUpdateExecute(ASQL, AParams)
-  else
-  if LCommand = 'delete' then
-    CommandDeleteExecute(ASQL, AParams);
+  try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    // Validar se estamos conectados ao Mongo
+    if FMongoConnection = nil then
+    begin
+       if FConnection.Connected then
+         FMongoConnection := TMongoConnection(FConnection.CliObj);
+       
+       if FMongoConnection = nil then
+         raise Exception.Create('MongoDB Connection not initialized.');
+       
+       FMongoEnv := FMongoConnection.Env;
+    end;
+
+    LCommand := TUtilSingleton
+                  .GetInstance
+                    .ParseCommandNoSQL('command', ASQL);
+    
+    if LCommand = 'insert' then
+      CommandInsertExecute(ASQL, AParams)
+    else
+    if LCommand = 'update' then
+      CommandUpdateExecute(ASQL, AParams)
+    else
+    if LCommand = 'delete' then
+      CommandDeleteExecute(ASQL, AParams)
+    else
+      raise Exception.Create('Command not supported for MongoDB: ' + LCommand);
+      
+    _SetMonitorLog(ASQL, '', AParams);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog('Error executing Mongo command', E.Message, AParams);
+      raise;
+    end;
+  end;
 end;
 
 procedure TDriverMongoFireDAC.ExecuteScript(const AScript: String);
 begin
-  inherited;
-//  FSQLScript.QMatch := ASQL;
-//  FSQLScript.Execute;
-  raise Exception
-          .Create('Command [ExecuteScript()] not supported for NoSQL MongoDB database!');
+  raise Exception.Create('Command [ExecuteScript()] not supported for NoSQL MongoDB database!');
 end;
 
 procedure TDriverMongoFireDAC.ExecuteScripts;
 begin
-  inherited;
-  raise Exception
-          .Create('Command [ExecuteScripts()] not supported for NoSQL MongoDB database!');
-//  if Length(FSQLScript.QMatch) > 0 then
-//  begin
-//    try
-//      FSQLScript.Execute;
-//    finally
-//      FSQLScript.QMatch := '';
-//    end;
-//  end;
+  raise Exception.Create('Command [ExecuteScripts()] not supported for NoSQL MongoDB database!');
 end;
 
 procedure TDriverMongoFireDAC.AddScript(const AScript: String);
 begin
-  inherited;
-//  FSQLScript.QMatch := ASQL;
-  raise Exception
-          .Create('Command [AddScript()] not supported for NoSQL MongoDB database!');
+  raise Exception.Create('Command [AddScript()] not supported for NoSQL MongoDB database!');
 end;
 
 procedure TDriverMongoFireDAC.CommandDeleteExecute(const ACommandText: String;
@@ -210,7 +207,6 @@ begin
   LUtil := TUtilSingleton.GetInstance;
   try
     LMongoSelector.Match(LUtil.ParseCommandNoSQL('json', ACommandText));
-//    LMongoSelector.FinalMatchBSON.AsJSON;
     FMongoConnection[FConnection.Params.Database]
                     [LUtil.ParseCommandNoSQL('collection', ACommandText)]
       .Remove(LMongoSelector);
@@ -230,7 +226,6 @@ begin
   try
     LMongoInsert
       .Values(LUtil.ParseCommandNoSQL('json', ACommandText));
-//    LMongoInsert.FinalValuesBSON.AsJSON;
     FMongoConnection[FConnection.Params.Database]
                     [LUtil.ParseCommandNoSQL('collection', ACommandText)]
       .Insert(LMongoInsert)
@@ -252,7 +247,6 @@ begin
       .Match(LUtil.ParseCommandNoSQL('filter', ACommandText));
     LMongoUpdate
       .Modify(LUtil.ParseCommandNoSQL('json', ACommandText));
-//    LMongoUpdate.FinalModifyBSON.AsJSON;
     FMongoConnection[FConnection.Params.Database]
                     [LUtil.ParseCommandNoSQL('collection', ACommandText)]
       .Update(LMongoUpdate);
@@ -263,50 +257,55 @@ end;
 
 procedure TDriverMongoFireDAC.Connect;
 begin
-  inherited;
   FConnection.Connected := True;
-end;
-
-function TDriverMongoFireDAC.InTransaction: Boolean;
-begin
-  Result := FConnection.InTransaction;
+  if FConnection.CliObj <> nil then
+  begin
+    FMongoConnection := TMongoConnection(FConnection.CliObj);
+    FMongoEnv := FMongoConnection.Env;
+  end;
 end;
 
 function TDriverMongoFireDAC.IsConnected: Boolean;
 begin
-  inherited;
   Result := FConnection.Connected;
 end;
 
 function TDriverMongoFireDAC.CreateQuery: IDBQuery;
 begin
-  Result := TDriverQueryMongoFireDAC.Create(FConnection, FMongoConnection, FMongoEnv);
+  Result := TDriverQueryMongoFireDAC.Create(FConnection, FDriverTransaction, FMongoConnection, FMongoEnv, FMonitorCallback);
 end;
 
 function TDriverMongoFireDAC.CreateDataSet(const ASQL: String): IDBResultSet;
 var
   LDBQuery: IDBQuery;
 begin
-  LDBQuery := TDriverQueryMongoFireDAC.Create(FConnection, FMongoConnection, FMongoEnv);
+  LDBQuery := TDriverQueryMongoFireDAC.Create(FConnection, FDriverTransaction, FMongoConnection, FMongoEnv, FMonitorCallback);
   LDBQuery.CommandText := ASQL;
   Result := LDBQuery.ExecuteQuery;
 end;
 
-{ TDriverDBExpressQuery }
+{ TDriverQueryMongoFireDAC }
 
-constructor TDriverQueryMongoFireDAC.Create(AConnection: TFDConnection;
-  AMongoConnection: TMongoConnection; AMongoEnv: TMongoEnv);
+constructor TDriverQueryMongoFireDAC.Create(const AConnection: TFDConnection;
+  const ADriverTransaction: TDriverTransaction;
+  const AMongoConnection: TMongoConnection;
+  const AMongoEnv: TMongoEnv;
+  const AMonitorCallback: TMonitorProc);
 begin
+  if AConnection = nil then
+    raise EArgumentNilException.Create('AConnection cannot be nil');
+
+  FDriverTransaction := ADriverTransaction;
+  FMonitorCallback := AMonitorCallback;
   FConnection := AConnection;
   FMongoConnection := AMongoConnection;
   FMongoEnv := AMongoEnv;
-  if AConnection = nil then
-    Exit;
 
   FFDMongoQuery := TFDMongoQuery.Create(nil);
   try
     FFDMongoQuery.Connection := AConnection;
-    FFDMongoQuery.DatabaseName := AConnection.Params.Database;
+    if AConnection.Params.Database <> '' then
+       FFDMongoQuery.DatabaseName := AConnection.Params.Database;
   except
     FFDMongoQuery.Free;
     raise;
@@ -316,11 +315,13 @@ end;
 destructor TDriverQueryMongoFireDAC.Destroy;
 begin
   FConnection := nil;
+  FMongoConnection := nil;
+  FMongoEnv := nil;
   FFDMongoQuery.Free;
   inherited;
 end;
 
-function TDriverQueryMongoFireDAC.ExecuteQuery: IDBResultSet;
+function TDriverQueryMongoFireDAC.ExecuteQuery: IDBDataSet;
 var
   LResultSet: TFDMongoQuery;
   LLimit, LSkip: UInt16;
@@ -330,101 +331,79 @@ begin
   LResultSet.CachedUpdates := True;
   LUtil := TUtilSingleton.GetInstance;
   try
+    if not Assigned(FFDMongoQuery.Connection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
     LResultSet.Connection := FFDMongoQuery.Connection;
     LResultSet.DatabaseName := FFDMongoQuery.Connection.Params.Database;
+    
+    // Parse QMatch parts
     LResultSet.CollectionName := LUtil.ParseCommandNoSQL('collection', FFDMongoQuery.QMatch);
     LResultSet.QMatch := LUtil.ParseCommandNoSQL('filter', FFDMongoQuery.QMatch);
     LResultSet.QSort := LUtil.ParseCommandNoSQL('sort', FFDMongoQuery.QMatch);
+    
     LLimit := StrToIntDef(LUtil.ParseCommandNoSQL('limit', FFDMongoQuery.QMatch), 0);
     LSkip := StrToIntDef(LUtil.ParseCommandNoSQL('skip', FFDMongoQuery.QMatch), 0);
+    
     if LLimit > 0 then
       LResultSet.Query.Limit(LLimit);
     if LSkip > 0 then
       LResultSet.Query.Skip(LSkip);
+      
     LResultSet.QProject := '{_id:0}';
-    LResultSet.Open;
-//    LResultSet.Query.FinalQueryBSON.AsJSON;
-  except
-    LResultSet.Free;
-    raise;
+    
+    try
+      LResultSet.Open;
+      Result := TDriverResultSetMongoFireDAC.Create(LResultSet, FMonitorCallback);
+      if LResultSet.Active and (LResultSet.RecordCount = 0) then
+        Result.FetchingAll := True;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(LResultSet.QMatch, E.Message, nil);
+        FreeAndNil(LResultSet);
+        raise;
+      end;
+    end;
+  finally
+     if Assigned(LResultSet) and (not Assigned(Result)) then
+       LResultSet.Free;
   end;
-  Result := TDriverResultSetMongoFireDAC.Create(LResultSet);
-  if LResultSet.RecordCount = 0 then
-    Result.FetchingAll := True;
 end;
 
-function TDriverQueryMongoFireDAC.GetCommandText: String;
+function TDriverQueryMongoFireDAC._GetCommandText: String;
 begin
   Result := FFDMongoQuery.QMatch;
 end;
 
-procedure TDriverQueryMongoFireDAC.SetCommandText(ACommandText: String);
+procedure TDriverQueryMongoFireDAC._SetCommandText(const ACommandText: String);
 begin
-  inherited;
   FFDMongoQuery.QMatch := ACommandText;
 end;
 
 procedure TDriverQueryMongoFireDAC.ExecuteDirect;
 begin
-//  FFDMongoQuery.Execute;
-  raise Exception
-          .Create('Command [ExecuteDirect()] not supported for NoSQL MongoDB database!');
+  raise Exception.Create('Command [ExecuteDirect()] not supported for NoSQL MongoDB database!');
 end;
 
 { TDriverResultSetMongoFireDAC }
 
-constructor TDriverResultSetMongoFireDAC.Create(ADataSet: TFDMongoQuery);
+constructor TDriverResultSetMongoFireDAC.Create(const ADataSet: TFDMongoQuery;
+  const AMonitorCallback: TMonitorProc);
 begin
-  FDataSet := ADataSet;
-  inherited;
+  inherited Create(ADataSet, AMonitorCallback);
 end;
 
 destructor TDriverResultSetMongoFireDAC.Destroy;
 begin
-  FDataSet.Free;
   inherited;
 end;
 
-function TDriverResultSetMongoFireDAC.GetFieldValue(
-  const AFieldName: String): Variant;
-var
-  LField: TField;
+function TDriverResultSetMongoFireDAC.RowsAffected: UInt32;
 begin
-  LField := FDataSet.FieldByName(AFieldName);
-  Result := GetFieldValue(LField.Index);
-end;
-
-function TDriverResultSetMongoFireDAC.GetFieldType(
-  const AFieldName: String): TFieldType;
-begin
-  Result := FDataSet.FieldByName(AFieldName).DataType;
-end;
-
-function TDriverResultSetMongoFireDAC.GetFieldValue(
-  const AFieldIndex: Uint16): Variant;
-begin
-  if AFieldIndex > FDataSet.FieldCount - 1 then
-    Exit(Variants.Null);
-
-  if FDataSet.Fields[AFieldIndex].IsNull then
-    Result := Variants.Null
-  else
-    Result := FDataSet.Fields[AFieldIndex].Value;
-end;
-
-function TDriverResultSetMongoFireDAC.GetField(
-  const AFieldName: String): TField;
-begin
-  Result := FDataSet.FieldByName(AFieldName);
-end;
-
-function TDriverResultSetMongoFireDAC.NotEof: Boolean;
-begin
-  if not FFirstNext then
-    FFirstNext := True
-  else
-    FDataSet.Next;
-  Result := not FDataSet.Eof;
+  Result := 0;
 end;
 
 end.

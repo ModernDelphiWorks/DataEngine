@@ -1,9 +1,14 @@
 ﻿{
-  @abstract(DBEngine4D: In-Memory Driver for Delphi)
-  @description(In-memory database driver for the DBEngine4D framework)
-  @created(03 Abr 2025)
-  @author(Isaque Pinheiro <isaquepsp@gmail.com>)
-  @Discord(https://discord.gg/T2zJC8zX)
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
+
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
+
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverMemory;
@@ -18,15 +23,15 @@ uses
   StrUtils,
   Variants,
   Generics.Collections,
-  DBEngine.Consts,
-  DBEngine.DriverConnection,
-  DBEngine.FactoryInterfaces,
+  DriverConnection,
+  FactoryInterfaces,
   System.Fluent,
   System.Fluent.Collections,
   System.Fluent.Helpers;
 
 type
   TMemoryRecord = class;
+  TMemoryConnection = class;
 
   IEntityCollection<T: class> = interface
     ['{C58080A0-5196-412E-9ABD-356AD42CEADF}']
@@ -131,43 +136,116 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+    function Clone: TMemoryRecord;
     property Fields: TFluentDictionary<string, Variant> read FFields;
   end;
 
-  TMemoryField = class(TField)
-  private
-    FRecord: TMemoryRecord;
-    FFieldName: string;
-  protected
-    function GetAsVariant: Variant; override;
-    procedure SetAsVariant(const Value: Variant); override;
-    function GetIsNull: Boolean; override;
-    function GetAsString: string; override;
-    function GetAsFloat: Double; override;
-    function GetAsInteger: Longint; override;
-    function GetAsBoolean: Boolean; override;
-  public
-    constructor Create(AOwner: TComponent; ARecord: TMemoryRecord; AFieldName: string); reintroduce;
-  end;
-
-  TMemoryDriver = class(TDriverConnection)
+  // ---------------------------------------------------------------------------
+  // TMemoryConnection (Component)
+  // ---------------------------------------------------------------------------
+  TMemoryConnection = class(TComponent)
   private
     FTables: TFluentDictionary<string, TFluentList<TMemoryRecord>>;
-    FConnection: TComponent;
     FConnected: Boolean;
-    FSQLScripts: TStringList;
+    FInTransaction: Boolean;
     FSqlParser: ISqlParser;
     FQueryExecutor: IQueryExecutor;
-    function _ExecuteSelect(const ASQL: string; const AParams: TParams): IDBDataSet;
+    FMonitorCallback: TMonitorProc;
+    FRowsAffected: UInt32;
+    FBackupTables: TFluentDictionary<string, TFluentList<TMemoryRecord>>;
+    procedure _SetMonitorLog(const ASQL, ATransactionName: String; const AParams: TParams);
     procedure _ParseAndExecuteSQL(const ASQL: string; const AParams: TParams = nil);
+    function _ExecuteSelect(const ASQL: string; const AParams: TParams): TFluentList<TMemoryRecord>;
     procedure _ExecuteInsert(const ASQL: string; const AParams: TParams);
     procedure _ExecuteUpdate(const ASQL: string; const AParams: TParams);
     procedure _ExecuteDelete(const ASQL: string; const AParams: TParams);
-    procedure _SetMonitorLog(const ASQL, ATransactionName: String; const AParams: TParams);
-    procedure _ClearTables;
+    procedure _ClearTables(ATables: TFluentDictionary<string, TFluentList<TMemoryRecord>>);
+    procedure _SnapshotTables;
+    procedure _RestoreTables;
+    function _ParseValues(const AValueString: string): TArray<string>;
+    function _ParseValue(const AValue: string): Variant;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    procedure Connect;
+    procedure Disconnect;
+    procedure StartTransaction;
+    procedure Commit;
+    procedure Rollback;
+    function InTransaction: Boolean;
+    procedure ExecuteDirect(const ASQL: String; const AParams: TParams);
+    // Returns a List of records, not a DataSet. DataSet is handled by TMemoryDataSet.
+    function ExecuteSelect(const ASQL: String; const AParams: TParams): TFluentList<TMemoryRecord>;
+    
+    property Connected: Boolean read FConnected;
+    property RowsAffected: UInt32 read FRowsAffected;
+    property MonitorCallback: TMonitorProc read FMonitorCallback write FMonitorCallback;
+  end;
+
+  // ---------------------------------------------------------------------------
+  // TMemoryDataSet (Component inheriting from TDataSet)
+  // ---------------------------------------------------------------------------
+  TMemoryDataSet = class(TDataSet)
+  private
+    FConnection: TMemoryConnection;
+    FSQL: TStrings;
+    FParams: TParams;
+    FRecords: TFluentList<TMemoryRecord>;
+    FCurrentIndex: Integer;
+    FIsOpen: Boolean;
+    procedure SetConnection(const Value: TMemoryConnection);
+    procedure SetSQL(const Value: TStrings);
+    procedure SetParams(const Value: TParams);
+  protected
+    // TDataSet abstract methods
+    function GetRecord(Buffer: TRecordBuffer; GetMode: TGetMode; DoCheck: Boolean): TGetResult; override;
+    function GetRecordCount: Integer; override;
+    function GetRecNo: Integer; override;
+    procedure InternalInitFieldDefs; override;
+    procedure InternalOpen; override;
+    procedure InternalClose; override;
+    procedure InternalHandleException; override;
+    procedure InternalGotoBookmark(Bookmark: TBookmark); override;
+    procedure InternalSetToRecord(Buffer: TRecordBuffer); override;
+    function IsCursorOpen: Boolean; override;
+    procedure SetRecNo(Value: Integer); override;
+    function AllocRecordBuffer: TRecordBuffer; override;
+    procedure FreeRecordBuffer(var Buffer: TRecordBuffer); override;
+    procedure GetBookmarkData(Buffer: TRecordBuffer; Data: TBookmark); override;
+    function GetBookmarkFlag(Buffer: TRecordBuffer): TBookmarkFlag; override;
+    procedure SetBookmarkFlag(Buffer: TRecordBuffer; Value: TBookmarkFlag); override;
+    procedure SetFieldData(Field: TField; Buffer: TValueBuffer); overload; override;
+    
+    // Modern Delphi GetFieldData overload
+    function GetFieldData(Field: TField; var Buffer: TValueBuffer): Boolean; overload; override;
+    // Older Delphi / Generic overload compatibility
+    function GetFieldData(Field: TField; Buffer: TValueBuffer): Boolean; overload; override;
+  private
+    function _VarTypeToFieldType(const AVarType: Word): TFieldType;
+    function _GetFieldSize(const AFieldType: TFieldType; const AValue: Variant): Integer;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    
+    procedure Execute; // Executes SQL without returning cursor (INSERT/UPDATE/DELETE)
+    
+    property Connection: TMemoryConnection read FConnection write SetConnection;
+    property SQL: TStrings read FSQL write SetSQL;
+    property Params: TParams read FParams write SetParams;
+  end;
+
+  // ---------------------------------------------------------------------------
+  // Drivers (Adapters)
+  // ---------------------------------------------------------------------------
+
+  TDriverMemory = class(TDriverConnection)
+  private
+    FConnection: TMemoryConnection;
+    FOwnsConnection: Boolean;
+    function _GetTransactionActive: TComponent;
   public
     constructor Create(const AConnection: TComponent; const ADriverTransaction: TDriverTransaction;
-      const ADriver: TDBEDriver; const AMonitorCallback: TMonitorProc); override;
+      const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
@@ -179,20 +257,19 @@ type
     procedure ApplyUpdates(const ADataSets: array of IDBDataSet); override;
     function IsConnected: Boolean; override;
     function CreateQuery: IDBQuery; override;
-    function CreateDataSet(const ASQL: String): IDBDataSet; override;
+    function CreateDataSet(const ASQL: String = ''): IDBDataSet; override;
     function GetSQLScripts: String; override;
   end;
 
-  TMemoryQuery = class(TDriverQuery)
+  TDriverQueryMemory = class(TDriverQuery)
   private
-    FSQL: string;
-    FParams: TParams;
-    FDriver: TMemoryDriver;
+    FDataSet: TMemoryDataSet;
+    function _GetTransactionActive: TComponent;
   protected
     procedure _SetCommandText(const ACommandText: String); override;
     function _GetCommandText: String; override;
   public
-    constructor Create(const ADriver: TMemoryDriver; const ADriverTransaction: TDriverTransaction;
+    constructor Create(const AConnection: TMemoryConnection; const ADriverTransaction: TDriverTransaction;
       const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
@@ -200,148 +277,14 @@ type
     function RowsAffected: UInt32; override;
   end;
 
-  TMemoryDataSet = class(TDriverDataSetBase)
-  private
-    FRecords: TFluentList<TMemoryRecord>;
-    FCurrentIndex: Integer;
-    FActive: Boolean;
-    FSQL: string;
-    FFields: TList<TMemoryField>;
-    FState: TDataSetState;
-    FModified: Boolean;
-    FBookmarks: TList<Integer>;
-    procedure _SetMonitorLog(const ASQL, ATransactionName: String; const AParams: TParams);
-    procedure UpdateFields;
+  // Inherits from TDriverDataSet<T> where T is TMemoryDataSet
+  TDriverDataSetMemory = class(TDriverDataSet<TMemoryDataSet>)
   protected
-    function _GetFilter: String; override;
-    function _GetFiltered: Boolean; override;
-    function _GetFilterOptions: TFilterOptions; override;
-    function _GetActive: Boolean; override;
     function _GetCommandText: String; override;
-    function _GetAfterCancel: TDataSetNotifyEvent; override;
-    function _GetAfterClose: TDataSetNotifyEvent; override;
-    function _GetAfterDelete: TDataSetNotifyEvent; override;
-    function _GetAfterEdit: TDataSetNotifyEvent; override;
-    function _GetAfterInsert: TDataSetNotifyEvent; override;
-    function _GetAfterOpen: TDataSetNotifyEvent; override;
-    function _GetAfterPost: TDataSetNotifyEvent; override;
-    function _GetAfterRefresh: TDataSetNotifyEvent; override;
-    function _GetAfterScroll: TDataSetNotifyEvent; override;
-    function _GetAutoCalcFields: Boolean; override;
-    function _GetBeforeCancel: TDataSetNotifyEvent; override;
-    function _GetBeforeClose: TDataSetNotifyEvent; override;
-    function _GetBeforeDelete: TDataSetNotifyEvent; override;
-    function _GetBeforeEdit: TDataSetNotifyEvent; override;
-    function _GetBeforeInsert: TDataSetNotifyEvent; override;
-    function _GetBeforeOpen: TDataSetNotifyEvent; override;
-    function _GetBeforePost: TDataSetNotifyEvent; override;
-    function _GetBeforeRefresh: TDataSetNotifyEvent; override;
-    function _GetBeforeScroll: TDataSetNotifyEvent; override;
-    function _GetOnCalcFields: TDataSetNotifyEvent; override;
-    function _GetOnDeleteError: TDataSetErrorEvent; override;
-    function _GetOnEditError: TDataSetErrorEvent; override;
-    function _GetOnFilterRecord: TFilterRecordEvent; override;
-    function _GetOnNewRecord: TDataSetNotifyEvent; override;
-    function _GetOnPostError: TDataSetErrorEvent; override;
-    function _GetSortFields: String; override;
-    function _GetBookmark: TBookmark; override;
-    function _GetFetchingAll: Boolean; override;
-    procedure _SetFilter(const Value: String); override;
-    procedure _SetFiltered(const Value: Boolean); override;
-    procedure _SetFilterOptions(Value: TFilterOptions); override;
-    procedure _SetActive(const Value: Boolean); override;
     procedure _SetCommandText(const ACommandText: String); override;
-    procedure _SetUniDirectional(const Value: Boolean); override;
-    procedure _SetReadOnly(const Value: Boolean); override;
-    procedure _SetCachedUpdates(const Value: Boolean); override;
-    procedure _SetAfterCancel(const Value: TDataSetNotifyEvent); override;
-    procedure _SetAfterOpen(const Value: TDataSetNotifyEvent); override;
-    procedure _SetAfterClose(const Value: TDataSetNotifyEvent); override;
-    procedure _SetAfterDelete(const Value: TDataSetNotifyEvent); override;
-    procedure _SetAfterEdit(const Value: TDataSetNotifyEvent); override;
-    procedure _SetAfterInsert(const Value: TDataSetNotifyEvent); override;
-    procedure _SetAfterPost(const Value: TDataSetNotifyEvent); override;
-    procedure _SetAfterRefresh(const Value: TDataSetNotifyEvent); override;
-    procedure _SetAfterScroll(const Value: TDataSetNotifyEvent); override;
-    procedure _SetAutoCalcFields(const Value: Boolean); override;
-    procedure _SetBeforeCancel(const Value: TDataSetNotifyEvent); override;
-    procedure _SetBeforeDelete(const Value: TDataSetNotifyEvent); override;
-    procedure _SetBeforeEdit(const Value: TDataSetNotifyEvent); override;
-    procedure _SetBeforeInsert(const Value: TDataSetNotifyEvent); override;
-    procedure _SetBeforeOpen(const Value: TDataSetNotifyEvent); override;
-    procedure _SetBeforeClose(const Value: TDataSetNotifyEvent); override;
-    procedure _SetBeforePost(const Value: TDataSetNotifyEvent); override;
-    procedure _SetBeforeRefresh(const Value: TDataSetNotifyEvent); override;
-    procedure _SetBeforeScroll(const Value: TDataSetNotifyEvent); override;
-    procedure _SetOnFilterRecord(const Value: TFilterRecordEvent); override;
-    procedure _SetOnCalcFields(const Value: TDataSetNotifyEvent); override;
-    procedure _SetOnDeleteError(const Value: TDataSetErrorEvent); override;
-    procedure _SetOnEditError(const Value: TDataSetErrorEvent); override;
-    procedure _SetOnNewRecord(const Value: TDataSetNotifyEvent); override;
-    procedure _SetOnPostError(const Value: TDataSetErrorEvent); override;
-    procedure _SetSortFields(const Value: String); override;
-    procedure _SetFetchingAll(const Value: Boolean); override;
-  public
-    constructor Create(const ARecords: TFluentList<TMemoryRecord>; const ASQL: string;
-      const AMonitorCallback: TMonitorProc);
-    destructor Destroy; override;
-    procedure Open; override;
-    procedure Close; override;
-    procedure Refresh; override;
-    procedure Delete; override;
-    procedure Cancel; override;
-    procedure Clear; override;
-    procedure DisableControls; override;
-    procedure EnableControls; override;
-    procedure Next; override;
-    procedure Prior; override;
-    procedure Append; override;
-    procedure Insert; override;
-    procedure Edit; override;
-    procedure Post; override;
-    procedure First; override;
-    procedure Last; override;
-    procedure MoveBy(Distance: Integer); override;
-    procedure CheckRequiredFields; override;
-    procedure FreeBookmark(Bookmark: TBookmark); override;
-    procedure ClearFields; override;
-    procedure ApplyUpdates; override;
-    procedure CancelUpdates; override;
-    function Locate(const KeyFields: String; const KeyValues: Variant;
-      Options: TLocateOptions): Boolean; override;
-    function Lookup(const KeyFields: String; const KeyValues: Variant;
-      const ResultFields: String): Variant; override;
-    function FieldCount: UInt16; override;
-    function State: TDataSetState; override;
-    function Modified: Boolean; override;
-    function FieldByName(const AFieldName: String): TField; override;
-    function RecordCount: UInt32; override;
-    function FieldDefs: TFieldDefs; override;
-    function Eof: Boolean; override;
-    function Bof: Boolean; override;
-    function RecNo: Integer; override;
-    function CanRefresh: Boolean; override;
-    function DataSetField: TDataSetField; override;
-    function DefaultFields: Boolean; override;
-    function Designer: TDataSetDesigner; override;
-    function FieldList: TFieldList; override;
-    function Found: Boolean; override;
-    function ObjectView: Boolean; override;
-    function RecordSize: Word; override;
-    function SparseArrays: Boolean; override;
-    function FieldDefList: TFieldDefList; override;
-    function Fields: TFields; override;
-    function AggFields: TFields; override;
-    function UpdateStatus: TUpdateStatus; override;
-    function CanModify: Boolean; override;
-    function IsEmpty: Boolean; override;
-    function DataSource: TDataSource; override;
-    function AsDataSet: TDataSet; override;
-    function IsUniDirectional: Boolean; override;
-    function IsReadOnly: Boolean; override;
-    function IsCachedUpdates: Boolean; override;
     function RowsAffected: UInt32; override;
-    function NormalizeFieldValue(const AFieldName: String; const AValue: Variant): Variant; override;
+  public
+    constructor Create(const ADataSet: TMemoryDataSet; const AMonitorCallback: TMonitorProc);
   end;
 
 implementation
@@ -665,9 +608,7 @@ begin
         begin
           if LRecord <> nil then
           begin
-            LResult.Add(TMemoryRecord.Create);
-            for var LPair in LRecord.Fields do
-              LResult[LResult.Count - 1].Fields.Add(LPair.Key, LPair.Value);
+            LResult.Add(LRecord.Clone);
           end;
         end;
       end;
@@ -713,233 +654,160 @@ begin
   inherited;
 end;
 
-{ TMemoryField }
+function TMemoryRecord.Clone: TMemoryRecord;
+var
+  LPair: TPair<string, Variant>;
+begin
+  Result := TMemoryRecord.Create;
+  for LPair in FFields do
+    Result.Fields.Add(LPair.Key, LPair.Value);
+end;
 
-constructor TMemoryField.Create(AOwner: TComponent; ARecord: TMemoryRecord; AFieldName: string);
+{ TMemoryConnection }
+
+constructor TMemoryConnection.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FRecord := ARecord;
-  FFieldName := AFieldName;
-  FieldKind := fkData;
-  Name := 'MemoryField_' + StringReplace(AFieldName, '.', '_', [rfReplaceAll]);
-end;
-
-function TMemoryField.GetAsString: string;
-begin
-  Result := VarToStr(GetAsVariant);
-end;
-
-function TMemoryField.GetAsFloat: Double;
-begin
-  Result := VarAsType(GetAsVariant, varDouble);
-end;
-
-function TMemoryField.GetAsInteger: Longint;
-begin
-  Result := VarAsType(GetAsVariant, varInteger);
-end;
-
-function TMemoryField.GetAsBoolean: Boolean;
-begin
-  Result := VarAsType(GetAsVariant, varBoolean);
-end;
-
-function TMemoryField.GetAsVariant: Variant;
-begin
-  if Assigned(FRecord) and FRecord.Fields.TryGetValue(FFieldName, Result) then
-  begin
-    Result := StringReplace(VarToStr(Result), '.', ',', [rfReplaceAll]);
-    Exit;
-  end;
-  Result := Null;
-end;
-
-procedure TMemoryField.SetAsVariant(const Value: Variant);
-begin
-  if Assigned(FRecord) then
-    FRecord.Fields[FFieldName] := Value
-  else
-    raise EDatabaseError.Create('Cannot set value: No active record');
-end;
-
-function TMemoryField.GetIsNull: Boolean;
-begin
-  Result := (not Assigned(FRecord)) or (not FRecord.Fields.ContainsKey(FFieldName)) or (VarIsNull(FRecord.Fields[FFieldName]));
-end;
-
-{ TMemoryDriver }
-
-procedure TMemoryDriver._SetMonitorLog(const ASQL, ATransactionName: String; const AParams: TParams);
-begin
-  if Assigned(FMonitorCallback) then
-    FMonitorCallback(TMonitorParam.Create('[Transaction: ' + ATransactionName + '] - ' + TrimRight(ASQL), AParams));
-end;
-
-constructor TMemoryDriver.Create(const AConnection: TComponent;
-  const ADriverTransaction: TDriverTransaction; const ADriver: TDBEDriver;
-  const AMonitorCallback: TMonitorProc);
-begin
-  inherited Create(AConnection, ADriverTransaction, ADriver, AMonitorCallback);
-  FConnection := AConnection;
   FTables := TFluentDictionary<string, TFluentList<TMemoryRecord>>.Create([doOwnsValues]);
-  FSQLScripts := TStringList.Create;
+  FBackupTables := TFluentDictionary<string, TFluentList<TMemoryRecord>>.Create([doOwnsValues]);
   FConnected := False;
   FRowsAffected := 0;
-  FSqlParser := TSqlParser.Create(AMonitorCallback);
-  FQueryExecutor := TQueryExecutor.Create(AMonitorCallback);
+  FSqlParser := TSqlParser.Create(FMonitorCallback);
+  FQueryExecutor := TQueryExecutor.Create(FMonitorCallback);
 end;
 
-destructor TMemoryDriver.Destroy;
+destructor TMemoryConnection.Destroy;
 begin
-  _ClearTables;
-  FConnection := nil;
-  FDriverTransaction := nil;
-  FSQLScripts.Free;
+  _ClearTables(FTables);
+  _ClearTables(FBackupTables);
   FTables.Free;
+  FBackupTables.Free;
   inherited;
 end;
 
-procedure TMemoryDriver.Connect;
+procedure TMemoryConnection.Connect;
 begin
   FConnected := True;
   _SetMonitorLog('Connected to Memory DB', '', nil);
 end;
 
-procedure TMemoryDriver.Disconnect;
+procedure TMemoryConnection.Disconnect;
 begin
   FConnected := False;
   _SetMonitorLog('Disconnected from Memory DB', '', nil);
 end;
 
-procedure TMemoryDriver.ExecuteDirect(const ASQL: String);
+procedure TMemoryConnection.StartTransaction;
 begin
-  ExecuteDirect(ASQL, nil);
+  if FInTransaction then
+    raise Exception.Create('Transaction already active.');
+  FInTransaction := True;
+  _SnapshotTables;
 end;
 
-procedure TMemoryDriver.ExecuteDirect(const ASQL: String; const AParams: TParams);
+procedure TMemoryConnection.Commit;
+begin
+  if not FInTransaction then
+    raise Exception.Create('No active transaction to commit.');
+  FInTransaction := False;
+  _ClearTables(FBackupTables); // Clear backup, keeping changes
+end;
+
+procedure TMemoryConnection.Rollback;
+begin
+  if not FInTransaction then
+    raise Exception.Create('No active transaction to rollback.');
+  FInTransaction := False;
+  _RestoreTables; // Restore from backup
+end;
+
+function TMemoryConnection.InTransaction: Boolean;
+begin
+  Result := FInTransaction;
+end;
+
+procedure TMemoryConnection._SnapshotTables;
+var
+  LTablePair: TPair<string, TFluentList<TMemoryRecord>>;
+  LNewTable: TFluentList<TMemoryRecord>;
+  LRecord: TMemoryRecord;
+begin
+  _ClearTables(FBackupTables);
+  for LTablePair in FTables do
+  begin
+    LNewTable := TFluentList<TMemoryRecord>.Create;
+    for LRecord in LTablePair.Value do
+      LNewTable.Add(LRecord.Clone);
+    FBackupTables.Add(LTablePair.Key, LNewTable);
+  end;
+end;
+
+procedure TMemoryConnection._RestoreTables;
+var
+  LTablePair: TPair<string, TFluentList<TMemoryRecord>>;
+  LNewTable: TFluentList<TMemoryRecord>;
+  LRecord: TMemoryRecord;
+begin
+  _ClearTables(FTables);
+  for LTablePair in FBackupTables do
+  begin
+    LNewTable := TFluentList<TMemoryRecord>.Create;
+    for LRecord in LTablePair.Value do
+      LNewTable.Add(LRecord.Clone);
+    FTables.Add(LTablePair.Key, LNewTable);
+  end;
+  _ClearTables(FBackupTables);
+end;
+
+procedure TMemoryConnection.ExecuteDirect(const ASQL: String; const AParams: TParams);
 var
   LSQL: string;
   LFor: Integer;
 begin
   if not FConnected then
     Connect;
-  if not FDriverTransaction.InTransaction then
-    FDriverTransaction.StartTransaction;
-  try
-    LSQL := ASQL;
-    if Assigned(AParams) then
-    begin
-      for LFor := 0 to AParams.Count - 1 do
-      begin
-        if AParams.Items[LFor].DataType in [ftString, ftMemo, ftWideString] then
-          LSQL := StringReplace(LSQL, ':' + AParams.Items[LFor].Name, QuotedStr(VarToStr(AParams.Items[LFor].Value)), [rfReplaceAll])
-        else
-          LSQL := StringReplace(LSQL, ':' + AParams.Items[LFor].Name, VarToStr(AParams.Items[LFor].Value), [rfReplaceAll]);
-      end;
-    end;
-    _SetMonitorLog(Format('Executing SQL: %s', [LSQL]), '', nil);
-    _ParseAndExecuteSQL(LSQL, AParams);
-    _SetMonitorLog(LSQL, 'MemoryTransaction', AParams);
-    FDriverTransaction.Commit;
-  except
-    FDriverTransaction.Rollback;
-    raise;
-  end;
-end;
 
-procedure TMemoryDriver.ExecuteScript(const AScript: String);
-var
-  LScript: TStringList;
-  LCommand: string;
-  LCurrent: string;
-  LFor: Integer;
-  LInQuote: Boolean;
-  LChar: Char;
-begin
-  LScript := TStringList.Create;
-  try
-    LCurrent := '';
-    LInQuote := False;
-    for LFor := 1 to Length(AScript) do
+  LSQL := ASQL;
+  if Assigned(AParams) then
+  begin
+    for LFor := 0 to AParams.Count - 1 do
     begin
-      LChar := AScript[LFor];
-      if LChar = '''' then
-        LInQuote := not LInQuote;
-      if (LChar = ';') and not LInQuote then
-      begin
-        if Trim(LCurrent) <> '' then
-          LScript.Add(Trim(LCurrent));
-        LCurrent := '';
-      end
+      if AParams.Items[LFor].DataType in [ftString, ftMemo, ftWideString] then
+        LSQL := StringReplace(LSQL, ':' + AParams.Items[LFor].Name, QuotedStr(VarToStr(AParams.Items[LFor].Value)), [rfReplaceAll])
       else
-        LCurrent := LCurrent + LChar;
+        LSQL := StringReplace(LSQL, ':' + AParams.Items[LFor].Name, VarToStr(AParams.Items[LFor].Value), [rfReplaceAll]);
     end;
-    if Trim(LCurrent) <> '' then
-      LScript.Add(Trim(LCurrent));
-
-    for LFor := 0 to LScript.Count - 1 do
-    begin
-      LCommand := Trim(LScript[LFor]);
-      if LCommand <> '' then
-      begin
-        _SetMonitorLog(Format('Executing script command: %s', [LCommand]), '', nil);
-        ExecuteDirect(LCommand);
-      end;
-    end;
-  finally
-    LScript.Free;
   end;
+  _SetMonitorLog(Format('Executing SQL: %s', [LSQL]), '', nil);
+  _ParseAndExecuteSQL(LSQL, AParams);
 end;
 
-procedure TMemoryDriver.AddScript(const AScript: String);
+function TMemoryConnection.ExecuteSelect(const ASQL: String; const AParams: TParams): TFluentList<TMemoryRecord>;
 begin
-  FSQLScripts.Add(AScript);
+  if not FConnected then
+    Connect;
+  Result := _ExecuteSelect(ASQL, AParams);
 end;
 
-procedure TMemoryDriver.ExecuteScripts;
-var
-  LFor: Integer;
+procedure TMemoryConnection._SetMonitorLog(const ASQL, ATransactionName: String; const AParams: TParams);
 begin
-  for LFor := 0 to FSQLScripts.Count - 1 do
-    ExecuteDirect(FSQLScripts[LFor]);
-  FSQLScripts.Clear;
+  if Assigned(FMonitorCallback) then
+    FMonitorCallback(TMonitorParam.Create('[Transaction: ' + ATransactionName + '] - ' + TrimRight(ASQL), AParams));
 end;
 
-procedure TMemoryDriver.ApplyUpdates(const ADataSets: array of IDBDataSet);
-begin
-  // Simulação: nada a fazer em memória
-end;
-
-function TMemoryDriver.IsConnected: Boolean;
-begin
-  Result := FConnected;
-end;
-
-function TMemoryDriver.CreateQuery: IDBQuery;
-begin
-  Result := TMemoryQuery.Create(Self,
-                                FDriverTransaction,
-                                FMonitorCallback);
-end;
-
-function TMemoryDriver.CreateDataSet(const ASQL: String): IDBDataSet;
-begin
-  Result := _ExecuteSelect(ASQL, nil);
-end;
-
-function TMemoryDriver.GetSQLScripts: String;
-begin
-  Result := FSQLScripts.Text;
-end;
-
-procedure TMemoryDriver._ParseAndExecuteSQL(const ASQL: string; const AParams: TParams);
+procedure TMemoryConnection._ParseAndExecuteSQL(const ASQL: string; const AParams: TParams);
 var
   LSQL: string;
+  LSelectResult: TFluentList<TMemoryRecord>;
 begin
   LSQL := UpperCase(Trim(ASQL));
 
   if LSQL.StartsWith('SELECT') then
-    _ExecuteSelect(LSQL, AParams)
+  begin
+    LSelectResult := _ExecuteSelect(LSQL, AParams);
+    if Assigned(LSelectResult) then
+      LSelectResult.Free; // Direct execution of select ignores result
+  end
   else if LSQL.StartsWith('INSERT INTO') then
     _ExecuteInsert(LSQL, AParams)
   else if LSQL.StartsWith('UPDATE') then
@@ -948,7 +816,55 @@ begin
     _ExecuteDelete(LSQL, AParams);
 end;
 
-procedure TMemoryDriver._ExecuteInsert(const ASQL: string; const AParams: TParams);
+function TMemoryConnection._ExecuteSelect(const ASQL: string; const AParams: TParams): TFluentList<TMemoryRecord>;
+var
+  LParseResult: TJoins;
+  LTable: TFluentList<TMemoryRecord>;
+  LJoinTable: TFluentList<TMemoryRecord>;
+  LTableAdapter: IEntityCollection<TMemoryRecord>;
+  LJoinTableAdapter: IEntityCollection<TMemoryRecord>;
+begin
+  LParseResult := FSqlParser.ParseSelect(ASQL);
+  LTable := nil;
+  LJoinTable := nil;
+
+  if FTables.TryGetValue(LParseResult.TableName, LTable) then
+  begin
+    LTableAdapter := TEntityCollectionAdapter<TMemoryRecord>.Create(LTable);
+    try
+      if LParseResult.Join <> '' then
+      begin
+        if FTables.TryGetValue(LParseResult.Join, LJoinTable) then
+          LJoinTableAdapter := TEntityCollectionAdapter<TMemoryRecord>.Create(LJoinTable)
+        else
+          LJoinTableAdapter := TEntityCollectionAdapter<TMemoryRecord>.Create(nil);
+      end
+      else
+        LJoinTableAdapter := TEntityCollectionAdapter<TMemoryRecord>.Create(nil);
+
+      try
+        Result := FQueryExecutor.ExecuteSelect(
+          LTableAdapter,
+          LJoinTableAdapter,
+          LParseResult.TableName,
+          LParseResult.Join,
+          LParseResult.JoinCondition,
+          LParseResult.Where
+        );
+      finally
+        LJoinTableAdapter := nil;
+      end;
+    finally
+      LTableAdapter := nil;
+    end;
+  end
+  else
+  begin
+    Result := TFluentList<TMemoryRecord>.Create;
+  end;
+end;
+
+procedure TMemoryConnection._ExecuteInsert(const ASQL: string; const AParams: TParams);
 var
   LTableName: string;
   LFields: TArray<string>;
@@ -956,8 +872,8 @@ var
   LRecord: TMemoryRecord;
   LFor: Integer;
   LField: string;
-  LValue: string;
-  LIntValue: Integer;
+  LValueStr: string;
+  LValue: Variant;
   LTable: TFluentList<TMemoryRecord>;
 begin
   LTableName := Trim(Copy(ASQL, Pos('INTO', UpperCase(ASQL)) + 5, Pos('(', ASQL) - Pos('INTO', UpperCase(ASQL)) - 5));
@@ -970,26 +886,17 @@ begin
   LRecord := TMemoryRecord.Create;
   try
     LFields := Copy(ASQL, Pos('(', ASQL) + 1, Pos(')', ASQL) - Pos('(', ASQL) - 1).Split([',']);
-    LValues := Copy(ASQL, Pos('VALUES', UpperCase(ASQL)) + 7, Pos(')', ASQL, Pos('VALUES', UpperCase(ASQL))) - Pos('VALUES', UpperCase(ASQL)) - 7).Split([',']);
+    LValueStr := Copy(ASQL, Pos('VALUES', UpperCase(ASQL)) + 7, Pos(')', ASQL, Pos('VALUES', UpperCase(ASQL))) - Pos('VALUES', UpperCase(ASQL)) - 7);
+    LValues := _ParseValues(LValueStr);
 
     for LFor := 0 to Min(Length(LFields), Length(LValues)) - 1 do
     begin
       LField := Trim(LFields[LFor]);
-      LValue := Trim(LValues[LFor]);
-      LValue := StringReplace(LValue, '''', '', [rfReplaceAll]);
-      LValue := StringReplace(LValue, '(', '', [rfReplaceAll]);
-      LValue := StringReplace(LValue, ')', '', [rfReplaceAll]);
-      if UpperCase(LField) = 'CLIENT_ID' then
-      begin
-        LIntValue := StrToIntDef(LValue, 0);
-        LRecord.Fields.Add(LField, LIntValue);
-        _SetMonitorLog(Format('Insert %s: %s -> %d', [LField, LValue, LIntValue]), '', nil);
-      end
-      else
-      begin
-        LRecord.Fields.Add(LField, LValue);
-        _SetMonitorLog(Format('Insert %s: %s', [LField, LValue]), '', nil);
-      end;
+      LValueStr := Trim(LValues[LFor]);
+      LValue := _ParseValue(LValueStr);
+      
+      LRecord.Fields.Add(LField, LValue);
+      _SetMonitorLog(Format('Insert %s: %s', [LField, VarToStr(LValue)]), '', nil);
     end;
     LTable.Add(LRecord);
     FRowsAffected := 1;
@@ -1000,7 +907,7 @@ begin
   end;
 end;
 
-procedure TMemoryDriver._ExecuteUpdate(const ASQL: string; const AParams: TParams);
+procedure TMemoryConnection._ExecuteUpdate(const ASQL: string; const AParams: TParams);
 var
   LTableName: string;
   LSetClause: string;
@@ -1008,12 +915,15 @@ var
   LTable: TFluentList<TMemoryRecord>;
   LSetPairs: TArray<string>;
   LField: string;
-  LValue: string;
+  LValueStr: string;
+  LValue: Variant;
   LRecord: TMemoryRecord;
   LFor: Integer;
   LIndex: Integer;
   LV: Variant;
   LUpdated: Boolean;
+  LWhereField, LWhereValueStr, LWhereOperator: string;
+  LWhereValue: Variant;
 begin
   LTableName := Trim(Copy(ASQL, 7, Pos('SET', ASQL) - 7));
   LSetClause := Trim(Copy(ASQL, Pos('SET', ASQL) + 4, Pos('WHERE', ASQL + ' ') - Pos('SET', ASQL) - 4));
@@ -1025,62 +935,137 @@ begin
   begin
     LSetPairs := LSetClause.Split([',']);
     FRowsAffected := 0;
+    
+    // Parse WHERE clause (Simple: Field = Value)
     if LWhere <> '' then
     begin
-      LField := Trim(Copy(LWhere, 1, Pos('=', LWhere) - 1));
-      LValue := Trim(Copy(LWhere, Pos('=', LWhere) + 1, Length(LWhere)));
-      LValue := StringReplace(LValue, '''', '', [rfReplaceAll]);
+      if Pos('=', LWhere) > 0 then LWhereOperator := '='
+      else if Pos('>', LWhere) > 0 then LWhereOperator := '>'
+      else if Pos('<', LWhere) > 0 then LWhereOperator := '<'
+      else LWhereOperator := '='; // Default or error
 
-      _SetMonitorLog(Format('Where: %s = %s', [LField, LValue]), '', nil);
+      LWhereField := Trim(Copy(LWhere, 1, Pos(LWhereOperator, LWhere) - 1));
+      LWhereValueStr := Trim(Copy(LWhere, Pos(LWhereOperator, LWhere) + 1, Length(LWhere)));
+      LWhereValue := _ParseValue(LWhereValueStr);
+
+      _SetMonitorLog(Format('Where: %s %s %s', [LWhereField, LWhereOperator, VarToStr(LWhereValue)]), '', nil);
 
       for LIndex := 0 to LTable.Count - 1 do
       begin
         LRecord := LTable[LIndex];
         LUpdated := False;
-        if LRecord.Fields.TryGetValue(LField, LV) then
+        if LRecord.Fields.TryGetValue(LWhereField, LV) then
         begin
-          _SetMonitorLog(Format('Record %d: %s = %s', [LIndex, LField, VarToStr(LV)]), '', nil);
+          if LWhereOperator = '=' then
+            LUpdated := (LV = LWhereValue)
+          else if LWhereOperator = '>' then
+            LUpdated := (LV > LWhereValue)
+          else if LWhereOperator = '<' then
+            LUpdated := (LV < LWhereValue);
 
-          if UpperCase(LField) = 'CLIENT_ID' then
+          if LUpdated then
           begin
-            if (VarType(LV) in [varInteger, varSmallInt, varInt64]) and (IntToStr(LV) = LValue) then
-            begin
-              for LFor := 0 to Length(LSetPairs) - 1 do
+             for LFor := 0 to Length(LSetPairs) - 1 do
               begin
                 LField := Trim(Copy(LSetPairs[LFor], 1, Pos('=', LSetPairs[LFor]) - 1));
-                LValue := Trim(Copy(LSetPairs[LFor], Pos('=', LSetPairs[LFor]) + 1, Length(LSetPairs[LFor])));
-                LValue := StringReplace(LValue, '''', '', [rfReplaceAll]);
-                LRecord.Fields[LField] := LValue;
-                _SetMonitorLog(Format('Updated: %s = %s', [LField, LValue]), '', nil);
+                LValueStr := Trim(Copy(LSetPairs[LFor], Pos('=', LSetPairs[LFor]) + 1, Length(LSetPairs[LFor])));
+                LValue := _ParseValue(LValueStr);
+                LRecord.Fields.AddOrSetValue(LField, LValue);
+                _SetMonitorLog(Format('Updated: %s = %s', [LField, VarToStr(LValue)]), '', nil);
               end;
-              LUpdated := True;
-            end;
-          end
-          else if VarToStr(LV) = LValue then
-          begin
-            for LFor := 0 to Length(LSetPairs) - 1 do
-            begin
-              LField := Trim(Copy(LSetPairs[LFor], 1, Pos('=', LSetPairs[LFor]) - 1));
-              LValue := Trim(Copy(LSetPairs[LFor], Pos('=', LSetPairs[LFor]) + 1, Length(LSetPairs[LFor])));
-              LValue := StringReplace(LValue, '''', '', [rfReplaceAll]);
-              LRecord.Fields[LField] := LValue;
-              _SetMonitorLog(Format('Updated: %s = %s', [LField, LValue]), '', nil);
-            end;
-            LUpdated := True;
+              Inc(FRowsAffected);
           end;
         end;
-        if LUpdated then
-        begin
-          Inc(FRowsAffected);
-          Break;
-        end;
       end;
+    end
+    else
+    begin
+      // Update ALL
+       for LIndex := 0 to LTable.Count - 1 do
+       begin
+          LRecord := LTable[LIndex];
+          for LFor := 0 to Length(LSetPairs) - 1 do
+          begin
+            LField := Trim(Copy(LSetPairs[LFor], 1, Pos('=', LSetPairs[LFor]) - 1));
+            LValueStr := Trim(Copy(LSetPairs[LFor], Pos('=', LSetPairs[LFor]) + 1, Length(LSetPairs[LFor])));
+            LValue := _ParseValue(LValueStr);
+            LRecord.Fields.AddOrSetValue(LField, LValue);
+          end;
+          Inc(FRowsAffected);
+       end;
     end;
     _SetMonitorLog(Format('Rows affected: %d', [FRowsAffected]), '', nil);
   end;
 end;
 
-procedure TMemoryDriver._ExecuteDelete(const ASQL: string; const AParams: TParams);
+function TMemoryConnection._ParseValues(const AValueString: string): TArray<string>;
+var
+  LList: TList<string>;
+  LCurrent: string;
+  LInQuote: Boolean;
+  LChar: Char;
+  I: Integer;
+begin
+  LList := TList<string>.Create;
+  try
+    LCurrent := '';
+    LInQuote := False;
+    for I := 1 to Length(AValueString) do
+    begin
+      LChar := AValueString[I];
+      if LChar = '''' then
+        LInQuote := not LInQuote;
+      
+      if (LChar = ',') and not LInQuote then
+      begin
+        LList.Add(Trim(LCurrent));
+        LCurrent := '';
+      end
+      else
+        LCurrent := LCurrent + LChar;
+    end;
+    if Trim(LCurrent) <> '' then
+      LList.Add(Trim(LCurrent));
+      
+    Result := LList.ToArray;
+  finally
+    LList.Free;
+  end;
+end;
+
+function TMemoryConnection._ParseValue(const AValue: string): Variant;
+var
+  LVal: string;
+  LInt: Integer;
+  LFloat: Double;
+begin
+  LVal := Trim(AValue);
+  if (LVal.StartsWith('''') and LVal.EndsWith('''')) then
+  begin
+    // String
+    Result := Copy(LVal, 2, Length(LVal) - 2);
+  end
+  else if TryStrToInt(LVal, LInt) then
+  begin
+    Result := LInt;
+  end
+  else if TryStrToFloat(LVal, LFloat) then
+  begin
+    Result := LFloat;
+  end
+  else if SameText(LVal, 'NULL') then
+  begin
+    Result := Null;
+  end
+  else
+  begin
+    // Fallback to string if not quoted but looks like string? 
+    // Or maybe assume it's a string if not number.
+    Result := LVal;
+  end;
+end;
+
+procedure TMemoryConnection._ExecuteDelete(const ASQL: string; const AParams: TParams);
 var
   LTableName: string;
   LWhere: string;
@@ -1116,990 +1101,650 @@ begin
   end;
 end;
 
-function TMemoryDriver._ExecuteSelect(const ASQL: string; const AParams: TParams): IDBDataSet;
-var
-  LParseResult: TJoins;
-  LTable: TFluentList<TMemoryRecord>;
-  LJoinTable: TFluentList<TMemoryRecord>;
-  LTableAdapter: IEntityCollection<TMemoryRecord>;
-  LJoinTableAdapter: IEntityCollection<TMemoryRecord>;
-  LResultList: TFluentList<TMemoryRecord>;
-begin
-  LParseResult := FSqlParser.ParseSelect(ASQL);
-  LTable := nil;
-  LJoinTable := nil;
-
-  if FTables.TryGetValue(LParseResult.TableName, LTable) then
-  begin
-    LTableAdapter := TEntityCollectionAdapter<TMemoryRecord>.Create(LTable);
-    try
-      if LParseResult.Join <> '' then
-      begin
-        if FTables.TryGetValue(LParseResult.Join, LJoinTable) then
-          LJoinTableAdapter := TEntityCollectionAdapter<TMemoryRecord>.Create(LJoinTable)
-        else
-          LJoinTableAdapter := TEntityCollectionAdapter<TMemoryRecord>.Create(nil);
-      end
-      else
-        LJoinTableAdapter := TEntityCollectionAdapter<TMemoryRecord>.Create(nil);
-
-      try
-        LResultList := FQueryExecutor.ExecuteSelect(
-          LTableAdapter,
-          LJoinTableAdapter,
-          LParseResult.TableName,
-          LParseResult.Join,
-          LParseResult.JoinCondition,
-          LParseResult.Where
-        );
-        Result := TMemoryDataSet.Create(LResultList,
-                                        ASQL,
-                                        FMonitorCallback);
-      finally
-        LJoinTableAdapter := nil;
-      end;
-    finally
-      LTableAdapter := nil;
-    end;
-  end
-  else
-  begin
-    LResultList := TFluentList<TMemoryRecord>.Create;
-    Result := TMemoryDataSet.Create(LResultList,
-                                    ASQL,
-                                    FMonitorCallback);
-  end;
-end;
-
-procedure TMemoryDriver._ClearTables;
+procedure TMemoryConnection._ClearTables(ATables: TFluentDictionary<string, TFluentList<TMemoryRecord>>);
 var
   LTable: TFluentList<TMemoryRecord>;
   LRecord: TMemoryRecord;
 begin
-  for LTable in FTables.Values do
+  for LTable in ATables.Values do
   begin
     for LRecord in LTable do
       LRecord.Free;
     LTable.Clear;
   end;
-end;
-
-{ TMemoryQuery }
-
-constructor TMemoryQuery.Create(const ADriver: TMemoryDriver;
-  const ADriverTransaction: TDriverTransaction;
-  const AMonitorCallback: TMonitorProc);
-begin
-  inherited Create;
-  FDriver := ADriver;
-  FDriverTransaction := ADriverTransaction;
-  FMonitorCallback := AMonitorCallback;
-  FParams := TParams.Create;
-end;
-
-destructor TMemoryQuery.Destroy;
-begin
-  FDriver := nil;
-  FParams.Free;
-  inherited;
-end;
-
-procedure TMemoryQuery.ExecuteDirect;
-begin
-  if not FDriverTransaction.InTransaction then
-    FDriverTransaction.StartTransaction;
-  try
-    FDriver.ExecuteDirect(FSQL, FParams);
-    FRowsAffected := FDriver.RowsAffected;
-    FDriverTransaction.Commit;
-  except
-    FDriverTransaction.Rollback;
-    raise;
-  end;
-end;
-
-function TMemoryQuery.ExecuteQuery: IDBDataSet;
-begin
-  if not FDriverTransaction.InTransaction then
-    FDriverTransaction.StartTransaction;
-  try
-    Result := FDriver._ExecuteSelect(FSQL, FParams);
-    FDriverTransaction.Commit;
-  except
-    FDriverTransaction.Rollback;
-    raise;
-  end;
-end;
-
-function TMemoryQuery.RowsAffected: UInt32;
-begin
-  Result := FRowsAffected;
-end;
-
-procedure TMemoryQuery._SetCommandText(const ACommandText: String);
-begin
-  FSQL := ACommandText;
-end;
-
-function TMemoryQuery._GetCommandText: String;
-begin
-  Result := FSQL;
+  ATables.Clear;
 end;
 
 { TMemoryDataSet }
 
-procedure TMemoryDataSet._SetMonitorLog(const ASQL, ATransactionName: String; const AParams: TParams);
+constructor TMemoryDataSet.Create(AOwner: TComponent);
 begin
-  if Assigned(FMonitorCallback) then
-    FMonitorCallback(TMonitorParam.Create('[Transaction: ' + ATransactionName + '] - ' + TrimRight(ASQL), AParams));
-end;
-
-constructor TMemoryDataSet.Create(const ARecords: TFluentList<TMemoryRecord>;
-  const ASQL: string; const AMonitorCallback: TMonitorProc);
-begin
-  inherited Create;
-  FRecords := ARecords;
-  FSQL := ASQL;
+  inherited Create(AOwner);
+  FSQL := TStringList.Create;
+  FParams := TParams.Create;
+  FRecords := nil;
   FCurrentIndex := -1;
-  FActive := False;
-  FMonitorCallback := AMonitorCallback;
-  FFields := TList<TMemoryField>.Create;
-  FState := dsInactive;
-  FModified := False;
-  FBookmarks := TList<Integer>.Create;
-  UpdateFields;
-end;
-
-function TMemoryDataSet.Designer: TDataSetDesigner;
-begin
-
+  FIsOpen := False;
 end;
 
 destructor TMemoryDataSet.Destroy;
-var
-  LField: TMemoryField;
-  LRecord: TMemoryRecord;
 begin
-  for LField in FFields do
-    LField.Free;
-  FFields.Free;
+  FSQL.Free;
+  FParams.Free;
   if Assigned(FRecords) then
   begin
-    _SetMonitorLog(Format('Destroying TMemoryDataSet, RecordCount=%d', [FRecords.Count]), '', nil);
-    for LRecord in FRecords do
-    begin
-      if Assigned(LRecord) then
-      begin
-        _SetMonitorLog(Format('Freeing TMemoryRecord with %d fields', [LRecord.Fields.Count]), '', nil);
-        LRecord.Free;
-      end;
-    end;
-    FRecords.Clear;
+    // Records are owned by the connection list in this simplified implementation 
+    // or by the result list. If ExecuteSelect returns a new list, we own it.
+    // ExecuteSelect returns a NEW list with CLONED records or NEW records.
+    // So we must free them.
+    FRecords.Clear; // TMemoryRecord destruction
     FRecords.Free;
   end;
-  FBookmarks.Free;
   inherited;
 end;
 
-procedure TMemoryDataSet.UpdateFields;
+procedure TMemoryDataSet.SetConnection(const Value: TMemoryConnection);
+begin
+  FConnection := Value;
+end;
+
+procedure TMemoryDataSet.SetSQL(const Value: TStrings);
+begin
+  FSQL.Assign(Value);
+end;
+
+procedure TMemoryDataSet.SetParams(const Value: TParams);
+begin
+  FParams.Assign(Value);
+end;
+
+procedure TMemoryDataSet.Execute;
+begin
+  if not Assigned(FConnection) then
+    raise Exception.Create('Connection not assigned');
+  FConnection.ExecuteDirect(FSQL.Text, FParams);
+end;
+
+procedure TMemoryDataSet.InternalOpen;
 var
-  LField: TMemoryField;
   LKey: string;
 begin
-  for LField in FFields do
-    LField.Free;
-  FFields.Clear;
-  if (FRecords.Count > 0) and Assigned(FRecords[0]) then
-  begin
-    for LKey in FRecords[0].Fields.Keys do
-    begin
-      LField := TMemoryField.Create(nil, nil, LKey);
-      LField.FieldName := LKey;
-      FFields.Add(LField);
-    end;
-  end;
-end;
-
-function TMemoryDataSet.ObjectView: Boolean;
-begin
-
-end;
-
-procedure TMemoryDataSet.Open;
-begin
-  FActive := True;
-  FState := dsBrowse;
-  FCurrentIndex := -1;
-  if FRecords.Count > 0 then
-  begin
-    First;
-    _SetMonitorLog(Format('DataSet opened, moved to first record, Index=%d', [FCurrentIndex]), '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.Close;
-begin
-  FActive := False;
-  FCurrentIndex := -1;
-  FState := dsInactive;
-  _SetMonitorLog('DataSet closed', '', nil);
-end;
-
-procedure TMemoryDataSet.Refresh;
-begin
-  if FActive then
-  begin
-    Close;
-    Open;
-  end;
-end;
-
-function TMemoryDataSet.DefaultFields: Boolean;
-begin
-
-end;
-
-procedure TMemoryDataSet.Delete;
-begin
-  if FActive and (FCurrentIndex >= 0) and (FCurrentIndex < FRecords.Count) then
-  begin
-    FRecords.Delete(FCurrentIndex);
-    if FCurrentIndex >= FRecords.Count then
-      FCurrentIndex := FRecords.Count - 1;
-    FState := dsBrowse;
-    UpdateFields;
-    _SetMonitorLog('Record deleted', '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.Cancel;
-begin
-  if FState in [dsInsert, dsEdit] then
-  begin
-    FState := dsBrowse;
-    FModified := False;
-    _SetMonitorLog('Changes canceled', '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.Clear;
-begin
-  if FActive then
+  if not Assigned(FConnection) then
+    raise Exception.Create('Connection not assigned');
+    
+  // Execute Select and get records
+  if Assigned(FRecords) then
   begin
     FRecords.Clear;
-    FCurrentIndex := -1;
-    FState := dsBrowse;
-    UpdateFields;
-    _SetMonitorLog('DataSet cleared', '', nil);
+    FRecords.Free;
   end;
+  
+  FRecords := FConnection.ExecuteSelect(FSQL.Text, FParams);
+  FCurrentIndex := -1;
+  FIsOpen := True;
+  
+  InternalInitFieldDefs;
+  
+  if DefaultFields then
+    CreateFields;
+    
+  BindFields(True);
 end;
 
-procedure TMemoryDataSet.DisableControls;
+procedure TMemoryDataSet.InternalClose;
 begin
-  // Não aplicável em memória
-end;
-
-procedure TMemoryDataSet.EnableControls;
-begin
-  // Não aplicável em memória
-end;
-
-function TMemoryDataSet.Eof: Boolean;
-begin
-  Result := not FActive or (FCurrentIndex >= FRecords.Count);
-  _SetMonitorLog(Format('Eof checked: Active=%s, Index=%d, Count=%d, Result=%s',
-    [BoolToStr(FActive, True), FCurrentIndex, FRecords.Count, BoolToStr(Result, True)]), '', nil);
-end;
-
-procedure TMemoryDataSet.Next;
-begin
-  if FActive and (FCurrentIndex <= FRecords.Count - 1) then
+  FIsOpen := False;
+  if Assigned(FRecords) then
   begin
-    Inc(FCurrentIndex);
-    _SetMonitorLog(Format('Moved to next record, Index=%d', [FCurrentIndex]), '', nil);
+    FRecords.Clear;
+    FreeAndNil(FRecords);
   end;
+  BindFields(False);
+  if DefaultFields then
+    DestroyFields;
 end;
 
-procedure TMemoryDataSet.Prior;
-begin
-  if FActive and (FCurrentIndex > 0) then
-  begin
-    Dec(FCurrentIndex);
-    _SetMonitorLog(Format('Moved to prior record, Index=%d', [FCurrentIndex]), '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.First;
-begin
-  if FActive and (FRecords.Count > 0) then
-  begin
-    FCurrentIndex := 0;
-    _SetMonitorLog('Moved to first record', '', nil);
-  end;
-end;
-
-function TMemoryDataSet.Found: Boolean;
-begin
-
-end;
-
-procedure TMemoryDataSet.Last;
-begin
-  if FActive and (FRecords.Count > 0) then
-  begin
-    FCurrentIndex := FRecords.Count - 1;
-    _SetMonitorLog('Moved to last record', '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.MoveBy(Distance: Integer);
-begin
-  if FActive then
-  begin
-    FCurrentIndex := EnsureRange(FCurrentIndex + Distance, 0, FRecords.Count - 1);
-    _SetMonitorLog(Format('Moved by %d, Index=%d', [Distance, FCurrentIndex]), '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.CheckRequiredFields;
-begin
-  // Não aplicável em memória
-end;
-
-procedure TMemoryDataSet.Append;
-begin
-  if FActive then
-  begin
-    FRecords.Add(TMemoryRecord.Create);
-    FCurrentIndex := FRecords.Count - 1;
-    FState := dsInsert;
-    FModified := True;
-    UpdateFields;
-    _SetMonitorLog('New record appended', '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.Insert;
-begin
-  if FActive then
-  begin
-    FRecords.Insert(FCurrentIndex, TMemoryRecord.Create);
-    FState := dsInsert;
-    FModified := True;
-    UpdateFields;
-    _SetMonitorLog('New record inserted', '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.Edit;
-begin
-  if FActive and (FCurrentIndex >= 0) and (FCurrentIndex < FRecords.Count) then
-  begin
-    FState := dsEdit;
-    FModified := True;
-    _SetMonitorLog('Editing record', '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.Post;
-begin
-  if FState in [dsInsert, dsEdit] then
-  begin
-    FState := dsBrowse;
-    FModified := False;
-    UpdateFields;
-    _SetMonitorLog('Changes posted', '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.FreeBookmark(Bookmark: TBookmark);
-begin
-  _SetMonitorLog('Bookmark freed', '', nil);
-end;
-
-procedure TMemoryDataSet.ClearFields;
-begin
-  if FActive and (FCurrentIndex >= 0) and (FCurrentIndex < FRecords.Count) then
-  begin
-    FRecords[FCurrentIndex].Fields.Clear;
-    UpdateFields;
-    _SetMonitorLog('Fields cleared', '', nil);
-  end;
-end;
-
-procedure TMemoryDataSet.ApplyUpdates;
-begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['ApplyUpdates', Self.ClassName]);
-end;
-
-procedure TMemoryDataSet.CancelUpdates;
-begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CancelUpdates', Self.ClassName]);
-end;
-
-function TMemoryDataSet.Locate(const KeyFields: String; const KeyValues: Variant;
-  Options: TLocateOptions): Boolean;
+procedure TMemoryDataSet.InternalInitFieldDefs;
 var
-  LField: string;
-  LValue: Variant;
-  LVariant: Variant;
-  LFor: Integer;
+  LRecord: TMemoryRecord;
+  LPair: TPair<string, Variant>;
+  LFieldType: TFieldType;
+  LFieldSize: Integer;
 begin
-  Result := False;
-  if FActive and (FRecords.Count > 0) then
+  FieldDefs.Clear;
+  if (Assigned(FRecords)) and (FRecords.Count > 0) then
   begin
-    LField := UpperCase(KeyFields);
-    if VarIsArray(KeyValues) then
-      LValue := KeyValues[0]
-    else
-      LValue := KeyValues;
-    for LFor := 0 to FRecords.Count - 1 do
+    LRecord := FRecords[0];
+    for LPair in LRecord.Fields do
     begin
-      if FRecords[LFor].Fields.TryGetValue(LField, LVariant) and (VarToStr(LVariant) = VarToStr(LValue)) then
-      begin
-        FCurrentIndex := LFor;
-        Result := True;
-        _SetMonitorLog(Format('Located record: %s=%s', [LField, VarToStr(LValue)]), '', nil);
-        Break;
-      end;
+      LFieldType := _VarTypeToFieldType(VarType(LPair.Value));
+      LFieldSize := _GetFieldSize(LFieldType, LPair.Value);
+      FieldDefs.Add(LPair.Key, LFieldType, LFieldSize);
     end;
   end;
 end;
 
-function TMemoryDataSet.Lookup(const KeyFields: String; const KeyValues: Variant;
-  const ResultFields: String): Variant;
-var
-  LField: string;
-  LValue: Variant;
-  LVariant: Variant;
-  LFor: Integer;
+function TMemoryDataSet._VarTypeToFieldType(const AVarType: Word): TFieldType;
 begin
-  Result := Null;
-  if FActive and (FRecords.Count > 0) then
-  begin
-    LField := UpperCase(KeyFields);
-    if VarIsArray(KeyValues) then
-      LValue := KeyValues[0]
-    else
-      LValue := KeyValues;
-    for LFor := 0 to FRecords.Count - 1 do
-    begin
-      if FRecords[LFor].Fields.TryGetValue(LField, LVariant) and (VarToStr(LVariant) = VarToStr(LValue)) then
-      begin
-        if FRecords[LFor].Fields.TryGetValue(UpperCase(ResultFields), Result) then
-        begin
-          _SetMonitorLog(Format('Lookup: %s=%s, Result=%s', [LField, VarToStr(LValue), VarToStr(Result)]), '', nil);
-          Break;
-        end;
-      end;
-    end;
-  end;
-end;
-
-function TMemoryDataSet._GetBookmark: TBookmark;
-var
-  LIndexBytes: TBytes;
-begin
-  if FActive and (FCurrentIndex >= 0) and (FCurrentIndex < FRecords.Count) then
-  begin
-    SetLength(LIndexBytes, SizeOf(Integer));
-    Move(FCurrentIndex, LIndexBytes[0], SizeOf(Integer));
-    Result := LIndexBytes;
-    FBookmarks.Add(FCurrentIndex);
-    _SetMonitorLog(Format('Bookmark created: %d', [FCurrentIndex]), '', nil);
-  end
+  case AVarType of
+    varSmallint, varInteger, varShortInt, varByte, varWord, varLongWord, varInt64:
+      Result := ftInteger; // Or ftLargeInt depending on precision
+    varSingle, varDouble, varCurrency:
+      Result := ftFloat;
+    varDate:
+      Result := ftDate; // or ftDateTime
+    varBoolean:
+      Result := ftBoolean;
+    varString, varUString, varOleStr:
+      Result := ftString;
   else
-    Result := nil;
-end;
-
-function TMemoryDataSet.FieldCount: UInt16;
-begin
-  if FActive and (FCurrentIndex >= 0) and (FCurrentIndex < FRecords.Count) then
-    Result := FRecords[FCurrentIndex].Fields.Count
-  else
-    Result := FFields.Count;
-end;
-
-function TMemoryDataSet.SparseArrays: Boolean;
-begin
-
-end;
-
-function TMemoryDataSet.State: TDataSetState;
-begin
-  Result := FState;
-end;
-
-function TMemoryDataSet.Modified: Boolean;
-begin
-  Result := FModified;
-end;
-
-function TMemoryDataSet.FieldByName(const AFieldName: String): TField;
-var
-  LField: TMemoryField;
-begin
-  for LField in FFields do
-  begin
-    if SameText(LField.FieldName, AFieldName) then
-    begin
-      if FActive and (FCurrentIndex >= 0) and (FCurrentIndex < FRecords.Count) then
-        LField.FRecord := FRecords[FCurrentIndex]
-      else
-        LField.FRecord := nil;
-      Exit(LField);
-    end;
+    Result := ftString; // Default
   end;
-  raise EDatabaseError.CreateFmt('Field %s not found', [AFieldName]);
 end;
 
-function TMemoryDataSet.RecNo: Integer;
+function TMemoryDataSet._GetFieldSize(const AFieldType: TFieldType; const AValue: Variant): Integer;
+begin
+  if AFieldType = ftString then
+    Result := Max(Length(VarToStr(AValue)), 255) // Default to 255 or actual length
+  else
+    Result := 0;
+end;
+
+function TMemoryDataSet.GetRecordCount: Integer;
+begin
+  if Assigned(FRecords) then
+    Result := FRecords.Count
+  else
+    Result := 0;
+end;
+
+function TMemoryDataSet.GetRecNo: Integer;
 begin
   Result := FCurrentIndex + 1;
 end;
 
-function TMemoryDataSet.RecordCount: UInt32;
+procedure TMemoryDataSet.SetRecNo(Value: Integer);
 begin
-  Result := FRecords.Count;
+  if (Value >= 1) and (Value <= RecordCount) then
+    FCurrentIndex := Value - 1;
 end;
 
-function TMemoryDataSet.FieldDefList: TFieldDefList;
+function TMemoryDataSet.IsCursorOpen: Boolean;
 begin
-
+  Result := FIsOpen;
 end;
 
-function TMemoryDataSet.RecordSize: Word;
+procedure TMemoryDataSet.InternalHandleException;
 begin
-
+  // Default implementation
 end;
 
-function TMemoryDataSet.FieldDefs: TFieldDefs;
+procedure TMemoryDataSet.InternalGotoBookmark(Bookmark: TBookmark);
+var
+  LIndex: Integer;
 begin
-  Result := TFieldDefs.Create(nil);
-  for var LField in FFields do
+  if Bookmark <> nil then
   begin
-    var LDef := Result.AddFieldDef;
-    LDef.Name := LField.FieldName;
-    LDef.DataType := ftVariant;
+    Move(Bookmark^, LIndex, SizeOf(Integer));
+    if (LIndex >= 0) and (LIndex < FRecords.Count) then
+      FCurrentIndex := LIndex;
   end;
 end;
 
-function TMemoryDataSet.FieldList: TFieldList;
+procedure TMemoryDataSet.InternalSetToRecord(Buffer: TRecordBuffer);
 begin
-
+  FCurrentIndex := PInteger(Buffer)^;
 end;
 
-function TMemoryDataSet.Fields: TFields;
+function TMemoryDataSet.AllocRecordBuffer: TRecordBuffer;
 begin
-
+  Result := AllocMem(SizeOf(Integer));
 end;
 
-function TMemoryDataSet.AggFields: TFields;
+procedure TMemoryDataSet.FreeRecordBuffer(var Buffer: TRecordBuffer);
 begin
-  Result := TFields.Create(AsDataSet);
+  FreeMem(Buffer);
 end;
 
-function TMemoryDataSet.UpdateStatus: TUpdateStatus;
+function TMemoryDataSet.GetRecord(Buffer: TRecordBuffer; GetMode: TGetMode; DoCheck: Boolean): TGetResult;
 begin
-  Result := usUnmodified;
+  Result := grOK;
+  case GetMode of
+    gmCurrent:
+      begin
+        if (FCurrentIndex < 0) or (FCurrentIndex >= RecordCount) then
+          Result := grError;
+      end;
+    gmNext:
+      begin
+        if FCurrentIndex < RecordCount - 1 then
+          Inc(FCurrentIndex)
+        else
+          Result := grEOF;
+      end;
+    gmPrior:
+      begin
+        if FCurrentIndex > 0 then
+          Dec(FCurrentIndex)
+        else
+          Result := grBOF;
+      end;
+  end;
+  
+  if Result = grOK then
+    PInteger(Buffer)^ := FCurrentIndex;
 end;
 
-function TMemoryDataSet.CanModify: Boolean;
+procedure TMemoryDataSet.GetBookmarkData(Buffer: TRecordBuffer; Data: TBookmark);
 begin
-  Result := True;
+  Move(PInteger(Buffer)^, Data^, SizeOf(Integer));
 end;
 
-function TMemoryDataSet.CanRefresh: Boolean;
+function TMemoryDataSet.GetBookmarkFlag(Buffer: TRecordBuffer): TBookmarkFlag;
 begin
-
+  Result := bfCurrent; // Simplified
 end;
 
-function TMemoryDataSet.IsEmpty: Boolean;
+procedure TMemoryDataSet.SetBookmarkFlag(Buffer: TRecordBuffer; Value: TBookmarkFlag);
 begin
-  Result := FRecords.Count = 0;
+  // Simplified
 end;
 
-function TMemoryDataSet.DataSetField: TDataSetField;
+// overload for newer Delphi versions
+function TMemoryDataSet.GetFieldData(Field: TField; var Buffer: TValueBuffer): Boolean;
+var
+  RecIdx: Integer;
+  LVal: Variant;
+  LInt: Integer;
+  LFloat: Double;
+  LDate: TDateTime;
+  LBool: WordBool;
+  LStr: string;
+  LBytes: TBytes;
 begin
-
-end;
-
-function TMemoryDataSet.DataSource: TDataSource;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet.AsDataSet: TDataSet;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet.Bof: Boolean;
-begin
-  Result := FActive and (FCurrentIndex <= 0);
-end;
-
-function TMemoryDataSet.IsUniDirectional: Boolean;
-begin
+  RecIdx := PInteger(ActiveBuffer)^;
   Result := False;
+  if (RecIdx >= 0) and (RecIdx < FRecords.Count) then
+  begin
+    if FRecords[RecIdx].Fields.TryGetValue(Field.FieldName, LVal) then
+    begin
+      if not VarIsNull(LVal) then
+      begin
+        case Field.DataType of
+          ftString, ftMemo, ftWideString:
+          begin
+            LStr := VarToStr(LVal);
+            LBytes := TEncoding.UTF8.GetBytes(LStr);
+            if Length(LBytes) > Length(Buffer) then
+              SetLength(Buffer, Length(LBytes) + 1);
+            Move(LBytes[0], Buffer[0], Length(LBytes));
+            Buffer[Length(LBytes)] := 0; 
+          end;
+          ftInteger, ftSmallint, ftWord, ftAutoInc:
+          begin
+            LInt := LVal;
+            Move(LInt, Buffer[0], SizeOf(Integer));
+          end;
+          ftFloat, ftCurrency:
+          begin
+            LFloat := LVal;
+            Move(LFloat, Buffer[0], SizeOf(Double));
+          end;
+          ftDate, ftTime, ftDateTime:
+          begin
+            LDate := VarToDateTime(LVal);
+            Move(LDate, Buffer[0], SizeOf(TDateTime));
+          end;
+          ftBoolean:
+          begin
+            LBool := LVal;
+            Move(LBool, Buffer[0], SizeOf(WordBool));
+          end;
+        else
+           // Fallback
+           LStr := VarToStr(LVal);
+           LBytes := TEncoding.UTF8.GetBytes(LStr);
+           if Length(LBytes) > Length(Buffer) then
+              SetLength(Buffer, Length(LBytes) + 1);
+           Move(LBytes[0], Buffer[0], Length(LBytes));
+           Buffer[Length(LBytes)] := 0;
+        end;
+        Result := True;
+      end;
+    end;
+  end;
 end;
 
-function TMemoryDataSet.IsReadOnly: Boolean;
+// overload for generic usage or older versions
+function TMemoryDataSet.GetFieldData(Field: TField; Buffer: TValueBuffer): Boolean;
+var
+  RecIdx: Integer;
+  LVal: Variant;
+  LInt: Integer;
+  LFloat: Double;
+  LDate: TDateTime;
+  LBool: WordBool;
+  LStr: string;
+  LBytes: TBytes;
 begin
+  RecIdx := PInteger(ActiveBuffer)^;
   Result := False;
+  if (RecIdx >= 0) and (RecIdx < FRecords.Count) then
+  begin
+    if FRecords[RecIdx].Fields.TryGetValue(Field.FieldName, LVal) then
+    begin
+      if not VarIsNull(LVal) then
+      begin
+         case Field.DataType of
+          ftString, ftMemo, ftWideString:
+          begin
+            LStr := VarToStr(LVal);
+            LBytes := TEncoding.UTF8.GetBytes(LStr);
+            Move(LBytes[0], Buffer[0], Min(Length(LBytes), Field.DataSize));
+          end;
+          ftInteger, ftSmallint, ftWord, ftAutoInc:
+          begin
+            LInt := LVal;
+            Move(LInt, Buffer[0], SizeOf(Integer));
+          end;
+          ftFloat, ftCurrency:
+          begin
+            LFloat := LVal;
+            Move(LFloat, Buffer[0], SizeOf(Double));
+          end;
+          ftDate, ftTime, ftDateTime:
+          begin
+            LDate := VarToDateTime(LVal);
+            Move(LDate, Buffer[0], SizeOf(TDateTime));
+          end;
+          ftBoolean:
+          begin
+            LBool := LVal;
+            Move(LBool, Buffer[0], SizeOf(WordBool));
+          end;
+        else
+           // Fallback
+           LStr := VarToStr(LVal);
+           LBytes := TEncoding.UTF8.GetBytes(LStr);
+           Move(LBytes[0], Buffer[0], Min(Length(LBytes), Field.DataSize));
+        end;
+        Result := True;
+      end;
+    end;
+  end;
 end;
 
-function TMemoryDataSet.IsCachedUpdates: Boolean;
+procedure TMemoryDataSet.SetFieldData(Field: TField; Buffer: TValueBuffer);
 begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['IsCachedUpdates', Self.ClassName]);
+  // Read-only for now in this Mock DataSet implementation context
+  // or implement logic to update FRecords
 end;
 
-function TMemoryDataSet.RowsAffected: UInt32;
-begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['RowsAffected', Self.ClassName]);
-end;
+{ TDriverMemory }
 
-function TMemoryDataSet.NormalizeFieldValue(const AFieldName: String; const AValue: Variant): Variant;
+constructor TDriverMemory.Create(const AConnection: TComponent;
+  const ADriverTransaction: TDriverTransaction; const ADriver: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc);
 begin
-  Result := AValue;
-end;
-
-function TMemoryDataSet._GetFilter: String;
-begin
-  Result := '';
-end;
-
-function TMemoryDataSet._GetFiltered: Boolean;
-begin
-  Result := False;
-end;
-
-function TMemoryDataSet._GetFilterOptions: TFilterOptions;
-begin
-  Result := [];
-end;
-
-function TMemoryDataSet._GetActive: Boolean;
-begin
-  Result := FActive;
-end;
-
-function TMemoryDataSet._GetCommandText: String;
-begin
-  Result := FSQL;
-end;
-
-function TMemoryDataSet._GetAfterCancel: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetAfterClose: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetAfterDelete: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetAfterEdit: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetAfterInsert: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetAfterOpen: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetAfterPost: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetAfterRefresh: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetAfterScroll: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetAutoCalcFields: Boolean;
-begin
-  Result := False;
-end;
-
-function TMemoryDataSet._GetBeforeCancel: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetBeforeClose: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetBeforeDelete: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetBeforeEdit: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetBeforeInsert: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetBeforeOpen: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetBeforePost: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetBeforeRefresh: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetBeforeScroll: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetOnCalcFields: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetOnDeleteError: TDataSetErrorEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetOnEditError: TDataSetErrorEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetOnFilterRecord: TFilterRecordEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetOnNewRecord: TDataSetNotifyEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetOnPostError: TDataSetErrorEvent;
-begin
-  Result := nil;
-end;
-
-function TMemoryDataSet._GetSortFields: String;
-begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['_GetSortFields', Self.ClassName]);
-end;
-
-function TMemoryDataSet._GetFetchingAll: Boolean;
-begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['_GetFetchingAll', Self.ClassName]);
-end;
-
-procedure TMemoryDataSet._SetFilter(const Value: String);
-begin
-  _SetMonitorLog('Filter not supported in memory', '', nil);
-end;
-
-procedure TMemoryDataSet._SetFiltered(const Value: Boolean);
-begin
-  _SetMonitorLog('Filtered not supported in memory', '', nil);
-end;
-
-procedure TMemoryDataSet._SetFilterOptions(Value: TFilterOptions);
-begin
-  _SetMonitorLog('FilterOptions not supported in memory', '', nil);
-end;
-
-procedure TMemoryDataSet._SetActive(const Value: Boolean);
-begin
-  if Value then
-    Open
+  inherited Create(AConnection, ADriverTransaction, ADriver, AMonitorCallback);
+  if AConnection is TMemoryConnection then
+  begin
+    FConnection := TMemoryConnection(AConnection);
+    FOwnsConnection := False;
+  end
   else
-    Close;
+  begin
+    FConnection := TMemoryConnection.Create(nil);
+    FOwnsConnection := True;
+  end;
+  FConnection.MonitorCallback := AMonitorCallback;
 end;
 
-procedure TMemoryDataSet._SetCommandText(const ACommandText: String);
+destructor TDriverMemory.Destroy;
 begin
-  FSQL := ACommandText;
+  if FOwnsConnection then
+    FConnection.Free;
+  FConnection := nil;
+  FDriverTransaction := nil;
+  inherited;
 end;
 
-procedure TMemoryDataSet._SetUniDirectional(const Value: Boolean);
+procedure TDriverMemory.Connect;
 begin
-  _SetMonitorLog('UniDirectional not supported in memory', '', nil);
+  FConnection.Connect;
 end;
 
-procedure TMemoryDataSet._SetReadOnly(const Value: Boolean);
+procedure TDriverMemory.Disconnect;
 begin
-  _SetMonitorLog('ReadOnly not supported in memory', '', nil);
+  FConnection.Disconnect;
 end;
 
-procedure TMemoryDataSet._SetCachedUpdates(const Value: Boolean);
+procedure TDriverMemory.ExecuteDirect(const ASQL: String);
 begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['_SetCachedUpdates', Self.ClassName]);
+  ExecuteDirect(ASQL, nil);
 end;
 
-procedure TMemoryDataSet._SetAfterCancel(const Value: TDataSetNotifyEvent);
+procedure TDriverMemory.ExecuteDirect(const ASQL: String; const AParams: TParams);
 begin
-  // Não suportado
+  if not FConnection.Connected then
+    FConnection.Connect;
+    
+  if FDriverTransaction.TransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+    
+  if not FDriverTransaction.InTransaction then
+    FDriverTransaction.StartTransaction;
+    
+  try
+    FConnection.ExecuteDirect(ASQL, AParams);
+    FRowsAffected := FConnection.RowsAffected;
+    FDriverTransaction.Commit;
+  except
+    FDriverTransaction.Rollback;
+    raise;
+  end;
 end;
 
-procedure TMemoryDataSet._SetAfterOpen(const Value: TDataSetNotifyEvent);
+procedure TDriverMemory.ExecuteScript(const AScript: String);
+var
+  LScript: TStringList;
+  LCommand: string;
+  LCurrent: string;
+  LFor: Integer;
+  LInQuote: Boolean;
+  LChar: Char;
 begin
-  // Não suportado
+  if FDriverTransaction.TransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
+  LScript := TStringList.Create;
+  try
+    LCurrent := '';
+    LInQuote := False;
+    for LFor := 1 to Length(AScript) do
+    begin
+      LChar := AScript[LFor];
+      if LChar = '''' then
+        LInQuote := not LInQuote;
+      if (LChar = ';') and not LInQuote then
+      begin
+        if Trim(LCurrent) <> '' then
+          LScript.Add(Trim(LCurrent));
+        LCurrent := '';
+      end
+      else
+        LCurrent := LCurrent + LChar;
+    end;
+    if Trim(LCurrent) <> '' then
+      LScript.Add(Trim(LCurrent));
+
+    for LFor := 0 to LScript.Count - 1 do
+    begin
+      LCommand := Trim(LScript[LFor]);
+      if LCommand <> '' then
+      begin
+        _SetMonitorLog(Format('Executing script command: %s', [LCommand]), '', nil);
+        ExecuteDirect(LCommand);
+      end;
+    end;
+  finally
+    LScript.Free;
+  end;
 end;
 
-procedure TMemoryDataSet._SetAfterClose(const Value: TDataSetNotifyEvent);
+procedure TDriverMemory.AddScript(const AScript: String);
 begin
-  // Não suportado
+  // Implementation of storing script if needed, or just execute in ExecuteScripts
 end;
 
-procedure TMemoryDataSet._SetAfterDelete(const Value: TDataSetNotifyEvent);
+procedure TDriverMemory.ExecuteScripts;
 begin
-  // Não suportado
+  // Implementation
 end;
 
-procedure TMemoryDataSet._SetAfterEdit(const Value: TDataSetNotifyEvent);
+procedure TDriverMemory.ApplyUpdates(const ADataSets: array of IDBDataSet);
 begin
-  // Não suportado
+  // Simulation: nothing to do in memory
 end;
 
-procedure TMemoryDataSet._SetAfterInsert(const Value: TDataSetNotifyEvent);
+function TDriverMemory.IsConnected: Boolean;
 begin
-  // Não suportado
+  Result := FConnection.Connected;
 end;
 
-procedure TMemoryDataSet._SetAfterPost(const Value: TDataSetNotifyEvent);
+function TDriverMemory.CreateQuery: IDBQuery;
 begin
-  // Não suportado
+  Result := TDriverQueryMemory.Create(FConnection,
+                                      FDriverTransaction,
+                                      FMonitorCallback);
 end;
 
-procedure TMemoryDataSet._SetAfterRefresh(const Value: TDataSetNotifyEvent);
+function TDriverMemory.CreateDataSet(const ASQL: String): IDBDataSet;
+var
+  LQuery: TDriverQueryMemory;
 begin
-  // Não suportado
+  // In this pattern, CreateDataSet usually returns a Query/DataSet wrapper
+  LQuery := TDriverQueryMemory.Create(FConnection, FDriverTransaction, FMonitorCallback);
+  LQuery.CommandText := ASQL;
+  Result := LQuery.ExecuteQuery;
 end;
 
-procedure TMemoryDataSet._SetAfterScroll(const Value: TDataSetNotifyEvent);
+function TDriverMemory.GetSQLScripts: String;
 begin
-  // Não suportado
+  Result := ''; 
 end;
 
-procedure TMemoryDataSet._SetAutoCalcFields(const Value: Boolean);
+function TDriverMemory._GetTransactionActive: TComponent;
 begin
-  // Não suportado
+  Result := FDriverTransaction.TransactionActive;
 end;
 
-procedure TMemoryDataSet._SetBeforeCancel(const Value: TDataSetNotifyEvent);
+{ TDriverQueryMemory }
+
+constructor TDriverQueryMemory.Create(const AConnection: TMemoryConnection;
+  const ADriverTransaction: TDriverTransaction;
+  const AMonitorCallback: TMonitorProc);
 begin
-  // Não suportado
+  if AConnection = nil then
+    raise Exception.Create('AConnection cannot be nil');
+  if ADriverTransaction = nil then
+    raise Exception.Create('ADriverTransaction cannot be nil');
+
+  inherited Create;
+  FDataSet := TMemoryDataSet.Create(nil);
+  FDataSet.Connection := AConnection;
+  FDriverTransaction := ADriverTransaction;
+  FMonitorCallback := AMonitorCallback;
 end;
 
-procedure TMemoryDataSet._SetBeforeDelete(const Value: TDataSetNotifyEvent);
+destructor TDriverQueryMemory.Destroy;
 begin
-  // Não suportado
+  FDataSet.Free;
+  inherited;
 end;
 
-procedure TMemoryDataSet._SetBeforeEdit(const Value: TDataSetNotifyEvent);
+function TDriverQueryMemory._GetTransactionActive: TComponent;
 begin
-  // Não suportado
+  Result := FDriverTransaction.TransactionActive;
 end;
 
-procedure TMemoryDataSet._SetBeforeInsert(const Value: TDataSetNotifyEvent);
+procedure TDriverQueryMemory.ExecuteDirect;
 begin
-  // Não suportado
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
+  if not FDriverTransaction.InTransaction then
+    FDriverTransaction.StartTransaction;
+  try
+    FDataSet.SQL.Text := _GetCommandText;
+    // FDataSet.Params... copy params if needed
+    FDataSet.Execute;
+    FRowsAffected := FDataSet.Connection.RowsAffected;
+    FDriverTransaction.Commit;
+  except
+    FDriverTransaction.Rollback;
+    raise;
+  end;
 end;
 
-procedure TMemoryDataSet._SetBeforeOpen(const Value: TDataSetNotifyEvent);
+function TDriverQueryMemory.ExecuteQuery: IDBDataSet;
 begin
-  // Não suportado
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
+  if not FDriverTransaction.InTransaction then
+    FDriverTransaction.StartTransaction;
+  try
+    FDataSet.SQL.Text := _GetCommandText;
+    FDataSet.Open;
+    Result := TDriverDataSetMemory.Create(FDataSet, FMonitorCallback);
+    FDriverTransaction.Commit;
+  except
+    FDriverTransaction.Rollback;
+    raise;
+  end;
 end;
 
-procedure TMemoryDataSet._SetBeforeClose(const Value: TDataSetNotifyEvent);
+function TDriverQueryMemory.RowsAffected: UInt32;
 begin
-  // Não suportado
+  Result := FRowsAffected;
 end;
 
-procedure TMemoryDataSet._SetBeforePost(const Value: TDataSetNotifyEvent);
+procedure TDriverQueryMemory._SetCommandText(const ACommandText: String);
 begin
-  // Não suportado
+  FDataSet.SQL.Text := ACommandText;
 end;
 
-procedure TMemoryDataSet._SetBeforeRefresh(const Value: TDataSetNotifyEvent);
+function TDriverQueryMemory._GetCommandText: String;
 begin
-  // Não suportado
+  Result := FDataSet.SQL.Text;
 end;
 
-procedure TMemoryDataSet._SetBeforeScroll(const Value: TDataSetNotifyEvent);
+{ TDriverDataSetMemory }
+
+constructor TDriverDataSetMemory.Create(const ADataSet: TMemoryDataSet;
+  const AMonitorCallback: TMonitorProc);
 begin
-  // Não suportado
+  // Initialize generic TDriverDataSet<TMemoryDataSet>
+  inherited Create(ADataSet, AMonitorCallback);
 end;
 
-procedure TMemoryDataSet._SetOnFilterRecord(const Value: TFilterRecordEvent);
+function TDriverDataSetMemory._GetCommandText: String;
 begin
-  // Não suportado
+  Result := FDataSet.SQL.Text;
 end;
 
-procedure TMemoryDataSet._SetOnCalcFields(const Value: TDataSetNotifyEvent);
+procedure TDriverDataSetMemory._SetCommandText(const ACommandText: String);
 begin
-  // Não suportado
+  FDataSet.SQL.Text := ACommandText;
 end;
 
-procedure TMemoryDataSet._SetOnDeleteError(const Value: TDataSetErrorEvent);
+function TDriverDataSetMemory.RowsAffected: UInt32;
 begin
-  // Não suportado
-end;
-
-procedure TMemoryDataSet._SetOnEditError(const Value: TDataSetErrorEvent);
-begin
-  // Não suportado
-end;
-
-procedure TMemoryDataSet._SetOnNewRecord(const Value: TDataSetNotifyEvent);
-begin
-  // Não suportado
-end;
-
-procedure TMemoryDataSet._SetOnPostError(const Value: TDataSetErrorEvent);
-begin
-  // Não suportado
-end;
-
-procedure TMemoryDataSet._SetSortFields(const Value: String);
-begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['_SetSortFields', Self.ClassName]);
-end;
-
-procedure TMemoryDataSet._SetFetchingAll(const Value: Boolean);
-begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['_SetFetchingAll', Self.ClassName]);
+  if Assigned(FDataSet.Connection) then
+    Result := FDataSet.Connection.RowsAffected
+  else
+    Result := 0;
 end;
 
 end.

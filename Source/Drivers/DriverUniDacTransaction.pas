@@ -1,29 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{
-  @abstract(DBE Framework)
-  @created(25 julho 2017)
-  @author(Marcos J O Nielsen <marcos@softniels.com.br>)
-  @author(Skype : marcos@softniels.com.br)
-
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverUniDacTransaction;
@@ -36,9 +21,8 @@ uses
   SysUtils,
   Generics.Collections,
   Uni,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
   TDriverUniDACTransaction = class(TDriverTransaction)
@@ -59,8 +43,13 @@ implementation
 
 constructor TDriverUniDACTransaction.Create(const AConnection: TComponent);
 begin
-  FTransactionList := TDictionary<String, TComponent>.Create;
+  inherited;
   FConnection := AConnection as TUniConnection;
+  
+  // Ensure we have a default transaction if UniDAC didn't create one (unlikely but safe)
+  if FConnection.DefaultTransaction = nil then
+    raise Exception.Create('Connection DefaultTransaction is nil');
+
   FConnection.DefaultTransaction.Name := 'DEFAULT';
   FTransactionList.Add('DEFAULT', FConnection.DefaultTransaction);
   FTransactionActive := FConnection.DefaultTransaction;
@@ -69,8 +58,6 @@ end;
 destructor TDriverUniDACTransaction.Destroy;
 begin
   FTransactionActive := nil;
-  FTransactionList.Clear;
-  FTransactionList.Free;
   FConnection := nil;
   inherited;
 end;

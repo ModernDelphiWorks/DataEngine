@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverElevateDBTransaction;
@@ -27,20 +16,18 @@ unit DriverElevateDBTransaction;
 interface
 
 uses
-  Classes,
-  DB,
+  System.Classes,
+  System.SysUtils,
+  Data.DB,
   edbcomps,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection;
 
 type
-  // Classe de conexão concreta com dbExpress
   TDriverElevateDBTransaction = class(TDriverTransaction)
   protected
     FConnection: TEDBDatabase;
   public
-    constructor Create(AConnection: TComponent); override;
+    constructor Create(const AConnection: TComponent); override;
     destructor Destroy; override;
     procedure StartTransaction; override;
     procedure Commit; override;
@@ -52,38 +39,58 @@ implementation
 
 { TDriverElevateDBTransaction }
 
-constructor TDriverElevateDBTransaction.Create(AConnection: TComponent);
+constructor TDriverElevateDBTransaction.Create(const AConnection: TComponent);
 begin
-  FConnection := AConnection as TEDBDatabase;
+  inherited Create(AConnection);
+  if not (AConnection is TEDBDatabase) then
+    raise Exception.Create('Invalid connection type. Expected TEDBDatabase.');
+    
+  FConnection := TEDBDatabase(AConnection);
+  // ElevateDB manages transactions on the database component itself
+  FTransactionList.Add('DEFAULT', FConnection);
+  FTransactionActive := FConnection;
 end;
 
 destructor TDriverElevateDBTransaction.Destroy;
 begin
+  FTransactionActive := nil;
   FConnection := nil;
   inherited;
 end;
 
 function TDriverElevateDBTransaction.InTransaction: Boolean;
 begin
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
+    
   Result := FConnection.InTransaction;
 end;
 
 procedure TDriverElevateDBTransaction.StartTransaction;
 begin
-  inherited;
-  FConnection.StartTransaction;
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined.');
+
+  if not FConnection.InTransaction then
+    FConnection.StartTransaction;
 end;
 
 procedure TDriverElevateDBTransaction.Commit;
 begin
-  inherited;
-  FConnection.Commit;
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined.');
+
+  if FConnection.InTransaction then
+    FConnection.Commit;
 end;
 
 procedure TDriverElevateDBTransaction.Rollback;
 begin
-  inherited;
-  FConnection.Rollback;
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined.');
+
+  if FConnection.InTransaction then
+    FConnection.Rollback;
 end;
 
 end.

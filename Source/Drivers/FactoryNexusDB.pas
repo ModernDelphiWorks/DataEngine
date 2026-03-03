@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit FactoryNexusDB;
@@ -31,21 +20,19 @@ uses
   Classes,
   SysUtils,
   nxdb,
-  // DBE
-  DBE.FactoryConnection,
-  DBE.FactoryInterfaces;
+  FactoryConnection,
+  FactoryInterfaces;
 
 type
-  // Fábrica de conexão concreta com NexusDB
   TFactoryNexusDB = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TnxDatabase;
-      const ADriverName: TDriverName); overload;
+      const ADriverName: TDBEngineDriver); overload;
     constructor Create(const AConnection: TnxDatabase;
-      const ADriverName: TDriverName;
+      const ADriverName: TDBEngineDriver;
       const AMonitor: ICommandMonitor); overload;
     constructor Create(const AConnection: TnxDatabase;
-      const ADriverName: TDriverName;
+      const ADriverName: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -54,44 +41,43 @@ type
 implementation
 
 uses
-  dbe.driver.nexusdb,
-  dbe.driver.nexusdb.transaction;
+  DriverNexusDB,
+  DriverNexusDBTransaction;
 
 { TFactoryNexusDB }
 
 constructor TFactoryNexusDB.Create(const AConnection: TnxDatabase;
-  const ADriverName: TDriverName);
+  const ADriverName: TDBEngineDriver);
 begin
   FDriverTransaction := TDriverNexusDBTransaction.Create(AConnection);
   FDriverConnection  := TDriverNexusDB.Create(AConnection,
                                               FDriverTransaction,
                                               ADriverName,
-                                              FCommandMonitor,
                                               FMonitorCallback);
   FAutoTransaction := False;
 end;
 
 constructor TFactoryNexusDB.Create(const AConnection: TnxDatabase;
-  const ADriverName: TDriverName; const AMonitor: ICommandMonitor);
+  const ADriverName: TDBEngineDriver; const AMonitor: ICommandMonitor);
 begin
-  Create(AConnection, ADriverName);
   FCommandMonitor := AMonitor;
+  Create(AConnection, ADriverName);
+end;
+
+constructor TFactoryNexusDB.Create(const AConnection: TnxDatabase;
+  const ADriverName: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+begin
+  FMonitorCallback := AMonitorCallback;
+  Create(AConnection, ADriverName);
 end;
 
 procedure TFactoryNexusDB.AddTransaction(const AKey: String;
   const ATransaction: TComponent);
 begin
-  if not (ATransaction is TnxDatabase) then
-    raise Exception.Create('Invalid transaction type. Expected TnxDatabase.');
-
+  // NexusDB typically manages transactions via the TnxDatabase component itself.
+  // If a separate transaction component mechanism exists or is used, validation
+  // should be added here similar to other drivers.
   inherited AddTransaction(AKey, ATransaction);
-end;
-
-constructor TFactoryNexusDB.Create(const AConnection: TUniConnection;
-  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
-begin
-  Create(AConnection, ADriverName);
-  FMonitorCallback := AMonitorCallback;
 end;
 
 destructor TFactoryNexusDB.Destroy;

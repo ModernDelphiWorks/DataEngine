@@ -1,88 +1,90 @@
+{
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
+
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
+
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
+}
+
 unit DriverODAC;
 
 interface
 
 uses
+  Classes,
+  SysUtils,
   DB,
-  System.Classes,
-  System.Variants,
-  System.SysUtils,
-  DBE.FactoryConnection,
-  System.Generics.Collections,
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces,
-  Ora;
+  Variants,
+  Ora,
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-
   TDriverODAC = class(TDriverConnection)
   protected
     FConnection: TOraSession;
     FSQLScript: TOraQuery;
   public
+    constructor Create(const AConnection: TComponent;
+      const ADriverTransaction: TDriverTransaction;
+      const ADriverName: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc); override;
+    destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
-    procedure ExecuteDirect(const ASQL: String); overload; override;
-    procedure ExecuteDirect(const ASQL: String; const AParams: TParams); overload; override;
+    procedure ExecuteDirect(const ASQL: String); override;
+    procedure ExecuteDirect(const ASQL: String;
+      const AParams: TParams); override;
     procedure ExecuteScript(const AScript: String); override;
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
     function IsConnected: Boolean; override;
-    function InTransaction: Boolean; override;
     function CreateQuery: IDBQuery; override;
     function CreateDataSet(const ASQL: String): IDBResultSet; override;
-
-    constructor Create(const AConnection: TComponent; const ADriverName: TDriverName); override;
-    destructor Destroy; override;
   end;
 
   TDriverQueryODAC = class(TDriverQuery)
   private
     FSQLQuery: TOraQuery;
   protected
-    procedure SetCommandText(ACommandText: String); override;
-    function GetCommandText: String; override;
+    procedure _SetCommandText(const ACommandText: String); override;
+    function _GetCommandText: String; override;
   public
-    constructor Create(AConnection: TOraSession);
+    constructor Create(const AConnection: TOraSession;
+      const ADriverTransaction: TDriverTransaction;
+      const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
+    function RowsAffected: UInt32; override;
   end;
 
-  TDriverResultSetODAC = class(TDriverResultSet<TOraQuery>)
+  TDriverDataSetODAC = class(TDriverDataSet<TOraQuery>)
   public
-    constructor Create(ADataSet: TOraQuery); override;
+    constructor Create(const ADataSet: TOraQuery; const AMonitorCallback: TMonitorProc); reintroduce;
     destructor Destroy; override;
-    function NotEof: Boolean; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; overload; override;
-    function GetField(const AFieldName: String): TField; override;
+    procedure Open; override;
+    function RowsAffected: UInt32; override;
   end;
-
 
 implementation
 
-{ TFactoryODAC }
-
-procedure TDriverODAC.AddScript(const AScript: String);
-begin
-  inherited;
-  FSQLScript.SQL.Add(AScript);
-end;
-
-procedure TDriverODAC.Connect;
-begin
-  inherited;
-  FConnection.Connected := True;
-end;
+{ TDriverODAC }
 
 constructor TDriverODAC.Create(const AConnection: TComponent;
-  const ADriverName: TDriverName);
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc);
 begin
   inherited;
   FConnection := AConnection as TOraSession;
-  FDriverName := ADriverName;
+  FDriverTransaction := ADriverTransaction;
+  FDriver := ADriverName;
+  FMonitorCallback := AMonitorCallback;
   FSQLScript := TOraQuery.Create(nil);
   try
     FSQLScript.Session := FConnection;
@@ -90,20 +92,6 @@ begin
     FSQLScript.Free;
     raise;
   end;
-end;
-
-function TDriverODAC.CreateQuery: IDBQuery;
-begin
-  Result := TDriverQueryODAC.Create(FConnection);
-end;
-
-function TDriverODAC.CreateDataSet(const ASQL: String): IDBResultSet;
-var
-  LDBQuery: IDBQuery;
-begin
-  LDBQuery := TDriverQueryODAC.Create(FConnection);
-  LDBQuery.CommandText := ASQL;
-  Result := LDBQuery.ExecuteQuery;
 end;
 
 destructor TDriverODAC.Destroy;
@@ -115,64 +103,146 @@ end;
 
 procedure TDriverODAC.Disconnect;
 begin
-  inherited;
   FConnection.Connected := False;
 end;
 
-procedure TDriverODAC.ExecuteDirect(const ASQL: String;
-  const AParams: TParams);
+procedure TDriverODAC.ExecuteDirect(const ASQL: String);
 var
   LExeSQL: TOraQuery;
-  LFor: UInt16;
+  LParams: TParams;
 begin
   LExeSQL := TOraQuery.Create(nil);
-
+  LParams := nil;
   try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
     LExeSQL.Session := FConnection;
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
     LExeSQL.SQL.Text := ASQL;
-
-    for LFor := 0 to AParams.Count - 1 do
-    begin
-      LExeSQL.ParamByName(AParams[LFor].Name).DataType := AParams[LFor].DataType;
-      LExeSQL.ParamByName(AParams[LFor].Name).Value    := AParams[LFor].Value;
-    end;
-
     try
       LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
     except
-      raise;
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error during direct execution', E.Message, nil);
+        raise;
+      end;
     end;
-
   finally
-    LExeSQL.Free;
+    if Assigned(LExeSQL) then
+    begin
+      _SetMonitorLog(LExeSQL.SQL.Text, '', LParams);
+      LExeSQL.Free;
+    end;
+    if Assigned(LParams) then
+    begin
+      LParams.Clear;
+      LParams.Free;
+    end;
   end;
 end;
 
-procedure TDriverODAC.ExecuteDirect(const ASQL: String);
+procedure TDriverODAC.ExecuteDirect(const ASQL: String; const AParams: TParams);
+var
+  LExeSQL: TOraQuery;
+  LParams: TParams;
+  LFor: Int16;
 begin
-  FConnection.ExecSQL(ASQL);
+  LExeSQL := TOraQuery.Create(nil);
+  LParams := nil;
+  try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    LExeSQL.Session := FConnection;
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+    LExeSQL.SQL.Text := ASQL;
+    if AParams.Count > 0 then
+    begin
+      for LFor := 0 to AParams.Count - 1 do
+      begin
+        if not Assigned(AParams[LFor]) then
+          raise Exception.Create(Format('Parameter "%s" is invalid or unassigned.', [AParams[LFor].Name]));
+          
+        LExeSQL.ParamByName(AParams[LFor].Name).DataType := AParams[LFor].DataType;
+        LExeSQL.ParamByName(AParams[LFor].Name).Value    := AParams[LFor].Value;
+      end;
+    end;
+    
+    try
+      LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error during direct execution', E.Message, nil);
+        raise;
+      end;
+    end;
+  finally
+    if Assigned(LExeSQL) then
+    begin
+      _SetMonitorLog(LExeSQL.SQL.Text, '', LParams);
+      LExeSQL.Free;
+    end;
+    if Assigned(LParams) then
+    begin
+      LParams.Clear;
+      LParams.Free;
+    end;
+  end;
 end;
 
 procedure TDriverODAC.ExecuteScript(const AScript: String);
 begin
-  inherited;
-  FSQLScript.SQL.Text := AScript;
-  FSQLScript.ExecSQL;
+  AddScript(AScript);
+  ExecuteScripts;
 end;
 
 procedure TDriverODAC.ExecuteScripts;
 begin
-  inherited;
   try
     FSQLScript.ExecSQL;
-  finally
-    FSQLScript.SQL.Clear;
+    FRowsAffected := FSQLScript.RowsAffected;
+    _SetMonitorLog(FSQLScript.SQL.Text, '', nil);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog('Error executing script', E.Message, nil);
+      raise;
+    end;
   end;
+  FSQLScript.SQL.Clear;
 end;
 
-function TDriverODAC.InTransaction: Boolean;
+procedure TDriverODAC.AddScript(const AScript: String);
 begin
-  Result := FConnection.InTransaction;
+  FSQLScript.SQL.Add(AScript);
+end;
+
+procedure TDriverODAC.Connect;
+begin
+  FConnection.Connected := True;
 end;
 
 function TDriverODAC.IsConnected: Boolean;
@@ -180,13 +250,31 @@ begin
   Result := FConnection.Connected;
 end;
 
+function TDriverODAC.CreateQuery: IDBQuery;
+begin
+  Result := TDriverQueryODAC.Create(FConnection, FDriverTransaction, FMonitorCallback);
+end;
+
+function TDriverODAC.CreateDataSet(const ASQL: String): IDBResultSet;
+var
+  LDBQuery: IDBQuery;
+begin
+  LDBQuery := TDriverQueryODAC.Create(FConnection, FDriverTransaction, FMonitorCallback);
+  LDBQuery.CommandText := ASQL;
+  Result := LDBQuery.ExecuteQuery;
+end;
+
 { TDriverQueryODAC }
 
-constructor TDriverQueryODAC.Create(AConnection: TOraSession);
+constructor TDriverQueryODAC.Create(const AConnection: TOraSession;
+  const ADriverTransaction: TDriverTransaction;
+  const AMonitorCallback: TMonitorProc);
 begin
   if AConnection = nil then
-    Exit;
+    raise EArgumentNilException.Create('AConnection cannot be nil');
 
+  FDriverTransaction := ADriverTransaction;
+  FMonitorCallback := AMonitorCallback;
   FSQLQuery := TOraQuery.Create(nil);
   try
     FSQLQuery.Session := AConnection;
@@ -202,97 +290,151 @@ begin
   inherited;
 end;
 
-procedure TDriverQueryODAC.ExecuteDirect;
-begin
-  FSQLQuery.ExecSQL;
-end;
-
-function TDriverQueryODAC.ExecuteQuery: IDBResultSet;
+function TDriverQueryODAC.ExecuteQuery: IDBDataSet;
 var
-  LResultSet: TOraQuery;
-  LFor: UInt16;
+  LDataSet: TOraQuery;
+  LParams: TParams;
+  LFor: Int16;
 begin
-  LResultSet := TOraQuery.Create(nil);
+  LDataSet := TOraQuery.Create(nil);
+  LParams := nil; 
   try
-    LResultSet.Session := FSQLQuery.Session;
-    LResultSet.SQL.Text := FSQLQuery.SQL.Text;
-
-    for LFor := 0 to FSQLQuery.Params.Count - 1 do
-    begin
-      LResultSet.Params[LFor].DataType := FSQLQuery.Params[LFor].DataType;
-      LResultSet.Params[LFor].Value    := FSQLQuery.Params[LFor].Value;
+    if not Assigned(FSQLQuery.Session) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+      
+    LDataSet.Session := FSQLQuery.Session;
+    LDataSet.SQL.Text := FSQLQuery.SQL.Text;
+    
+    try
+      if FSQLQuery.Params.Count > 0 then
+      begin
+        for LFor := 0 to FSQLQuery.Params.Count - 1 do
+        begin
+           LDataSet.ParamByName(FSQLQuery.Params[LFor].Name).DataType := FSQLQuery.Params[LFor].DataType;
+           LDataSet.ParamByName(FSQLQuery.Params[LFor].Name).Value    := FSQLQuery.Params[LFor].Value;
+        end;
+      end;
+      
+      if LDataSet.SQL.Text = '' then
+        raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+        
+      LDataSet.Open;
+      Result := TDriverDataSetODAC.Create(LDataSet, FMonitorCallback);
+      if LDataSet.Active then
+      begin
+         if LDataSet.RecordCount = 0 then
+           Result.FetchingAll := True;
+      end;
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(LDataSet.SQL.Text, E.Message, nil);
+        FreeAndNil(LDataSet);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error', E.Message, nil);
+        FreeAndNil(LDataSet);
+        raise;
+      end;
     end;
-    LResultSet.Open;
-  except
-    LResultSet.Free;
-    raise;
+  finally
+    if Assigned(LDataSet) and (not Assigned(Result)) then 
+       LDataSet.Free; 
   end;
-  Result := TDriverResultSetODAC.Create(LResultSet);
-
-  if LResultSet.Eof then
-     Result.FetchingAll := True;
 end;
 
-function TDriverQueryODAC.GetCommandText: String;
+function TDriverQueryODAC.RowsAffected: UInt32;
+begin
+  Result := FRowsAffected;
+end;
+
+function TDriverQueryODAC._GetCommandText: String;
 begin
   Result := FSQLQuery.SQL.Text;
 end;
 
-procedure TDriverQueryODAC.SetCommandText(ACommandText: String);
+procedure TDriverQueryODAC._SetCommandText(const ACommandText: String);
+begin
+  FSQLQuery.SQL.Text := ACommandText;
+end;
+
+procedure TDriverQueryODAC.ExecuteDirect;
+var
+  LExeSQL: TOraQuery;
+  LFor: Int16;
+begin
+  LExeSQL := TOraQuery.Create(nil);
+  try
+    if not Assigned(FSQLQuery.Session) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    LExeSQL.Session := FSQLQuery.Session;
+    LExeSQL.SQL.Text := FSQLQuery.SQL.Text;
+    
+    if FSQLQuery.Params.Count > 0 then
+    begin
+      for LFor := 0 to FSQLQuery.Params.Count - 1 do
+      begin
+        LExeSQL.ParamByName(FSQLQuery.Params[LFor].Name).DataType := FSQLQuery.Params[LFor].DataType;
+        LExeSQL.ParamByName(FSQLQuery.Params[LFor].Name).Value    := FSQLQuery.Params[LFor].Value;
+      end;
+    end;
+    
+    try
+      LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(LExeSQL.SQL.Text, E.Message, nil);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error', E.Message, nil);
+        raise;
+      end;
+    end;
+  finally
+    if Assigned(LExeSQL) then
+    begin
+      _SetMonitorLog(LExeSQL.SQL.Text, '', nil);
+      LExeSQL.Free;
+    end;
+  end;
+end;
+
+{ TDriverDataSetODAC }
+
+constructor TDriverDataSetODAC.Create(const ADataSet: TOraQuery;
+  const AMonitorCallback: TMonitorProc);
+begin
+  inherited Create(ADataSet, AMonitorCallback);
+end;
+
+destructor TDriverDataSetODAC.Destroy;
 begin
   inherited;
-  FSQLQuery.SQL.Add(ACommandText);
 end;
 
-{ TDriverResultSetODAC }
-
-constructor TDriverResultSetODAC.Create(ADataSet: TOraQuery);
+procedure TDriverDataSetODAC.Open;
 begin
-  FDataSet := ADataSet;
-  inherited;
+  try
+    inherited Open;
+  finally
+    _SetMonitorLog(FDataSet.SQL.Text, '', nil);
+  end;
 end;
 
-destructor TDriverResultSetODAC.Destroy;
+function TDriverDataSetODAC.RowsAffected: UInt32;
 begin
-  FDataSet.Free;
-  inherited;
-end;
-
-function TDriverResultSetODAC.GetField(const AFieldName: String): TField;
-begin
-  Result := FDataSet.FieldByName(AFieldName);
-end;
-
-function TDriverResultSetODAC.GetFieldType(
-  const AFieldName: String): TFieldType;
-begin
-  Result := FDataSet.FieldByName(AFieldName).DataType;
-end;
-
-function TDriverResultSetODAC.GetFieldValue(const AFieldIndex: UInt16): Variant;
-begin
-  if AFieldIndex > FDataSet.FieldCount -1  then
-    Exit(Null);
-
-  if FDataSet.Fields[AFieldIndex].IsNull then
-    Result := Null
-  else
-    Result := FDataSet.Fields[AFieldIndex].Value;
-end;
-
-function TDriverResultSetODAC.GetFieldValue(const AFieldName: String): Variant;
-begin
-  Result := GetFieldValue(FDataSet.FieldByName(AFieldName).Index);
-end;
-
-function TDriverResultSetODAC.NotEof: Boolean;
-begin
-  if not FFirstNext then
-     FFirstNext := True
-  else
-     FDataSet.Next;
-
-  Result := not FDataSet.Eof;
+  Result := FDataSet.RowsAffected;
 end;
 
 end.

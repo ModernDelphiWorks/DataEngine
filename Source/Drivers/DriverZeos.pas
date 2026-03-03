@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverZeos;
@@ -41,14 +30,16 @@ uses
   ZAbstractDataset,
   ZDataset,
   ZSqlProcessor,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  DriverZeosTransaction,
+  FactoryInterfaces;
 
 type
-  TDataSetHacker = class(TDataSet);
+  TZQueryHelper = class Helper for TZQuery
+  public
+    function AsParams: TParams;
+  end;
 
-  // Classe de conexão concreta com Zeos
   TDriverZeos = class(TDriverConnection)
   private
     {$IFDEF ZEOS80UP}
@@ -60,8 +51,7 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDriverName;
-      const AMonitor: ICommandMonitor;
+      const ADriver: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
@@ -71,10 +61,10 @@ type
     procedure ExecuteScript(const AScript: String); override;
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
-    procedure ApplyUpdates(const ADataSets: array of IDBResultSet); override;
+    procedure ApplyUpdates(const ADataSets: array of IDBDataSet); override;
     function IsConnected: Boolean; override;
     function CreateQuery: IDBQuery; override;
-    function CreateDataSet(const ASQL: String = ''): IDBResultSet; override;
+    function CreateDataSet(const ASQL: String = ''): IDBDataSet; override;
     function GetSQLScripts: String; override;
   end;
 
@@ -90,15 +80,14 @@ type
   public
     constructor Create(const AConnection: TZConnection;
       const ADriverTransaction: TDriverTransaction;
-      const AMonitor: ICommandMonitor;
       const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
     function RowsAffected: UInt32; override;
   end;
 
-  TDriverResultSetZeos = class(TDriverResultSet<TZQuery>)
+  TDriverDataSetZeos = class(TDriverDataSet<TZQuery>)
   protected
     procedure _SetUniDirectional(const Value: Boolean); override;
     procedure _SetReadOnly(const Value: Boolean); override;
@@ -106,17 +95,11 @@ type
     procedure _SetCommandText(const ACommandText: String); override;
     function _GetCommandText: String; override;
   public
-    constructor Create(const ADataSet: TZQuery; const AMonitor: ICommandMonitor;
-      const AMonitorCallback: TMonitorProc); reintroduce;
+    constructor Create(const ADataSet: TZQuery; const AMonitorCallback: TMonitorProc); reintroduce;
     destructor Destroy; override;
     procedure Open; override;
     procedure ApplyUpdates; override;
     procedure CancelUpdates; override;
-    function NotEof: Boolean; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; overload; override;
-    function GetField(const AFieldName: String): TField; override;
     function RowsAffected: UInt32; override;
     function IsUniDirectional: Boolean; override;
     function IsReadOnly: Boolean; override;
@@ -125,18 +108,31 @@ type
 
 implementation
 
+{ TZQueryHelper }
+
+function TZQueryHelper.AsParams: TParams;
+var
+  LFor: Int16;
+begin
+  Result := TParams.Create;
+  for LFor := 0 to Self.Params.Count - 1 do
+  begin
+    Result.Add;
+    Result[LFor].DataType := Self.Params[LFor].DataType;
+    Result[LFor].Value := Self.Params[LFor].Value;
+  end;
+end;
+
 { TDriverZeos }
 
 constructor TDriverZeos.Create(const AConnection: TComponent;
   const ADriverTransaction: TDriverTransaction;
-  const ADriverName: TDriverName;
-  const AMonitor: ICommandMonitor;
+  const ADriver: TDBEngineDriver;
   const AMonitorCallback: TMonitorProc);
 begin
   FConnection := AConnection as TZConnection;
   FDriverTransaction := ADriverTransaction;
-  FDriverName := ADriverName;
-  FCommandMonitor := AMonitor;
+  FDriver := ADriver;
   FMonitorCallback := AMonitorCallback;
   FSQLScript := TZSQLProcessor.Create(nil);
   try
@@ -164,56 +160,121 @@ end;
 procedure TDriverZeos.ExecuteDirect(const ASQL: String);
 var
   LExeSQL: TZQuery;
+  LParams: TParams;
 begin
   LExeSQL := TZQuery.Create(nil);
+  LParams := nil;
   try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    {$IFDEF ZEOS80UP}
+    if _GetTransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+    {$ENDIF}
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
     LExeSQL.Connection := FConnection;
     {$IFDEF ZEOS80UP}
     LExeSQL.Transaction := _GetTransactionActive;
     {$ENDIF}
     LExeSQL.SQL.Text := ASQL;
-    if not LExeSQL.Prepared then
-      LExeSQL.Prepare;
-    LExeSQL.ExecSQL;
+    
+    try
+      if not LExeSQL.Prepared then
+        LExeSQL.Prepare;
+      LExeSQL.ExecSQL;
+      LParams := LExeSQL.AsParams;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+    end;
   finally
-    {$IFDEF ZEOS80UP}
-    _SetMonitorLog(LExeSQL.SQL.Text, LExeSQL.Transaction.Name, LExeSQL.Params);
-    {$ELSE}
-    _SetMonitorLog(LExeSQL.SQL.Text, 'DEFAULT', LExeSQL.Params);
-    {$ENDIF}
-    FRowsAffected := LExeSQL.RowsAffected;
-    LExeSQL.Free;
+    if Assigned(LExeSQL) then
+    begin
+      if LExeSQL.Active then
+        LExeSQL.Close;
+      {$IFDEF ZEOS80UP}
+      _SetMonitorLog(LExeSQL.SQL.Text, LExeSQL.Transaction.Name, LParams);
+      {$ELSE}
+      _SetMonitorLog(LExeSQL.SQL.Text, 'DEFAULT', LParams);
+      {$ENDIF}
+      LExeSQL.Free;
+    end;
+    if Assigned(LParams) then
+    begin
+      LParams.Clear;
+      LParams.Free;
+    end;
   end;
 end;
 
 procedure TDriverZeos.ExecuteDirect(const ASQL: String; const AParams: TParams);
 var
   LExeSQL: TZQuery;
+  LParams: TParams;
   LFor: Int16;
 begin
   LExeSQL := TZQuery.Create(nil);
+  LParams := nil;
   try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    {$IFDEF ZEOS80UP}
+    if _GetTransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+    {$ENDIF}
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
     LExeSQL.Connection := FConnection;
     {$IFDEF ZEOS80UP}
     LExeSQL.Transaction := _GetTransactionActive;
     {$ENDIF}
     LExeSQL.SQL.Text := ASQL;
-    for LFor := 0 to AParams.Count - 1 do
+    if AParams.Count > 0 then
     begin
-      LExeSQL.ParamByName(AParams[LFor].Name).DataType := AParams[LFor].DataType;
-      LExeSQL.ParamByName(AParams[LFor].Name).Value := AParams[LFor].Value;
+      for LFor := 0 to AParams.Count - 1 do
+      begin
+        LExeSQL.ParamByName(AParams[LFor].Name).DataType := AParams[LFor].DataType;
+        LExeSQL.ParamByName(AParams[LFor].Name).Value := AParams[LFor].Value;
+      end;
     end;
-    if not LExeSQL.Prepared then
-      LExeSQL.Prepare;
-    LExeSQL.ExecSQL;
+    
+    try
+      if not LExeSQL.Prepared then
+        LExeSQL.Prepare;
+      LExeSQL.ExecSQL;
+      LParams := LExeSQL.AsParams;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+    end;
   finally
-    {$IFDEF ZEOS80UP}
-    _SetMonitorLog(LExeSQL.SQL.Text, LExeSQL.Transaction.Name, LExeSQL.Params);
-    {$ELSE}
-    _SetMonitorLog(LExeSQL.SQL.Text, 'DEFAULT', LExeSQL.Params);
-    {$ENDIF}
-    FRowsAffected := LExeSQL.RowsAffected;
-    LExeSQL.Free;
+    if Assigned(LExeSQL) then
+    begin
+      if LExeSQL.Active then
+        LExeSQL.Close;
+      {$IFDEF ZEOS80UP}
+      _SetMonitorLog(LExeSQL.SQL.Text, LExeSQL.Transaction.Name, LParams);
+      {$ELSE}
+      _SetMonitorLog(LExeSQL.SQL.Text, 'DEFAULT', LParams);
+      {$ENDIF}
+      LExeSQL.Free;
+    end;
+    if Assigned(LParams) then
+    begin
+      LParams.Clear;
+      LParams.Free;
+    end;
   end;
 end;
 
@@ -226,12 +287,27 @@ end;
 procedure TDriverZeos.ExecuteScripts;
 begin
   if FSQLScript.Script.Count = 0 then
-    Exit;
+    raise Exception.Create('No SQL scripts found to execute.');
+
+  {$IFDEF ZEOS80UP}
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+  {$ENDIF}
+
   try
     {$IFDEF ZEOS80UP}
     FSQLScript.Transaction := _GetTransactionActive;
     {$ENDIF}
-    FSQLScript.Execute;
+    
+    try
+      FSQLScript.Execute;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog('Error during script execution', E.Message, nil);
+        raise;
+      end;
+    end;
   finally
     {$IFDEF ZEOS80UP}
     _SetMonitorLog(FSQLScript.Script.Text, FSQLScript.Transaction.Name, nil);
@@ -254,15 +330,15 @@ end;
 
 procedure TDriverZeos.AddScript(const AScript: String);
 begin
-  if Self.GetDriverName in [dnInterbase, dnFirebird, dnFirebird3] then
+  if Self.GetDriver in [dnInterbase, dnFirebird, dnFirebird3] then
     if FSQLScript.Script.Count = 0 then
       FSQLScript.Script.Add('SET AUTOCOMMIT OFF');
   FSQLScript.Script.Add(AScript);
 end;
 
-procedure TDriverZeos.ApplyUpdates(const ADataSets: array of IDBResultSet);
+procedure TDriverZeos.ApplyUpdates(const ADataSets: array of IDBDataSet);
 var
-  LDataSet: IDBResultSet;
+  LDataSet: IDBDataSet;
 begin
   for LDataset in AdataSets do
     LDataset.ApplyUpdates;
@@ -289,35 +365,32 @@ function TDriverZeos.CreateQuery: IDBQuery;
 begin
   Result := TDriverQueryZeos.Create(FConnection,
                                     FDriverTransaction,
-                                    FCommandMonitor,
                                     FMonitorCallback);
 end;
 
-function TDriverZeos.CreateDataSet(const ASQL: String): IDBResultSet;
+function TDriverZeos.CreateDataSet(const ASQL: String): IDBDataSet;
 var
   LDBQuery: IDBQuery;
 begin
   LDBQuery := TDriverQueryZeos.Create(FConnection,
                                       FDriverTransaction,
-                                      FCommandMonitor,
                                       FMonitorCallback);
   LDBQuery.CommandText := ASQL;
   Result := LDBQuery.ExecuteQuery;
 end;
 
-{ TDriverZeosQuery }
+{ TDriverQueryZeos }
 
 constructor TDriverQueryZeos.Create(const AConnection: TZConnection;
   const ADriverTransaction: TDriverTransaction;
-  const AMonitor: ICommandMonitor;
   const AMonitorCallback: TMonitorProc);
 begin
   if AConnection = nil then
-    Exit;
-  {$IFDEF ZEOS80UP}
+    raise Exception.Create('AConnection cannot be nil');
+  if ADriverTransaction = nil then
+    raise Exception.Create('ADriverTransaction cannot be nil');
+
   FDriverTransaction := ADriverTransaction;
-  {$ENDIF}
-  FCommandMonitor := AMonitor;
   FMonitorCallback := AMonitorCallback;
   FSQLQuery := TZQuery.Create(nil);
   try
@@ -334,48 +407,77 @@ begin
   inherited;
 end;
 
-function TDriverQueryZeos.ExecuteQuery: IDBResultSet;
+function TDriverQueryZeos.ExecuteQuery: IDBDataSet;
 var
   LResultSet: TZQuery;
+  LParams: TParams;
   LFor: Int16;
 begin
   LResultSet := TZQuery.Create(nil);
+  LParams := nil;
   try
+    if not Assigned(FSQLQuery.Connection) then
+      raise Exception.Create('Connection not assigned.');
+    {$IFDEF ZEOS80UP}
+    if _GetTransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+    {$ENDIF}
+
     LResultSet.Connection := FSQLQuery.Connection;
     {$IFDEF ZEOS80UP}
     LResultSet.Transaction := _GetTransactionActive;
     {$ENDIF}
     LResultSet.SQL.Text := FSQLQuery.SQL.Text;
+    
+    if LResultSet.SQL.Text = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
     try
-      for LFor := 0 to FSQLQuery.Params.Count - 1 do
+      if FSQLQuery.Params.Count > 0 then
       begin
-        LResultSet.Params[LFor].DataType := FSQLQuery.Params[LFor].DataType;
-        LResultSet.Params[LFor].Value := FSQLQuery.Params[LFor].Value;
+        for LFor := 0 to FSQLQuery.Params.Count - 1 do
+        begin
+          LResultSet.ParamByName(FSQLQuery.Params[LFor].Name).DataType := FSQLQuery.Params[LFor].DataType;
+          LResultSet.ParamByName(FSQLQuery.Params[LFor].Name).Value := FSQLQuery.Params[LFor].Value;
+        end;
       end;
-      if LResultSet.SQL.Text <> EmptyStr then
-      begin
-        if not LResultSet.Prepared then
-          LResultSet.Prepare;
-        LResultSet.Open;
-      end;
-      Result := TDriverResultSetZeos.Create(LResultSet, FCommandMonitor, FMonitorCallback);
+      
+      if not LResultSet.Prepared then
+        LResultSet.Prepare;
+      LResultSet.Open;
+      
+      Result := TDriverDataSetZeos.Create(LResultSet, FMonitorCallback);
       if LResultSet.Active then
       begin
         if LResultSet.RecordCount = 0 then
           Result.FetchingAll := True;
       end;
-    finally
-      if LResultSet.SQL.Text <> EmptyStr then
+      LParams := LResultSet.AsParams;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(LResultSet.SQL.Text, E.Message, LParams);
+        FreeAndNil(LResultSet);
+        raise;
+      end;
+    end;
+  finally
+    if Assigned(LResultSet) then
+    begin
+      if LResultSet.Active then
+        LResultSet.Close;
+      if LResultSet.SQL.Text <> '' then
         {$IFDEF ZEOS80UP}
-        _SetMonitorLog(LResultSet.SQL.Text, LResultSet.Transaction.Name, LResultSet.Params);
+        _SetMonitorLog(LResultSet.SQL.Text, LResultSet.Transaction.Name, LParams);
         {$ELSE}
-        _SetMonitorLog(LResultSet.SQL.Text, 'DEFAULT', LResultSet.Params);
+        _SetMonitorLog(LResultSet.SQL.Text, 'DEFAULT', LParams);
         {$ENDIF}
     end;
-  except
-    if Assigned(LResultSet) then
-      LResultSet.Free;
-    raise;
+    if Assigned(LParams) then
+    begin
+      LParams.Clear;
+      LParams.Free;
+    end;
   end;
 end;
 
@@ -390,9 +492,9 @@ begin
 end;
 
 {$IFDEF ZEOS80UP}
-function TDriverQueryZeos._GetTransactionActive: TUniTransaction;
+function TDriverQueryZeos._GetTransactionActive: TZTransaction;
 begin
-  Result := FDriverTransaction.TransactionActive as TUniTransaction;
+  Result := FDriverTransaction.TransactionActive as TZTransaction;
 end;
 {$ENDIF}
 
@@ -404,159 +506,157 @@ end;
 procedure TDriverQueryZeos.ExecuteDirect;
 var
   LExeSQL: TZQuery;
+  LParams: TParams;
   LFor: Int16;
 begin
   LExeSQL := TZQuery.Create(nil);
+  LParams := nil;
   try
+    if not Assigned(FSQLQuery.Connection) then
+      raise Exception.Create('Connection not assigned.');
+    {$IFDEF ZEOS80UP}
+    if _GetTransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+    {$ENDIF}
+    
+    if FSQLQuery.SQL.Text = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
     LExeSQL.Connection := FSQLQuery.Connection;
     {$IFDEF ZEOS80UP}
     LExeSQL.Transaction := _GetTransactionActive;
     {$ENDIF}
     LExeSQL.SQL.Text := FSQLQuery.SQL.Text;
-    for LFor := 0 to FSQLQuery.Params.Count - 1 do
+    
+    if FSQLQuery.Params.Count > 0 then
     begin
-      LExeSQL.Params[LFor].DataType := FSQLQuery.Params[LFor].DataType;
-      LExeSQL.Params[LFor].Value := FSQLQuery.Params[LFor].Value;
+      for LFor := 0 to FSQLQuery.Params.Count - 1 do
+      begin
+        LExeSQL.ParamByName(FSQLQuery.Params[LFor].Name).DataType := FSQLQuery.Params[LFor].DataType;
+        LExeSQL.ParamByName(FSQLQuery.Params[LFor].Name).Value := FSQLQuery.Params[LFor].Value;
+      end;
     end;
-    if not LExeSQL.Prepared then
-      LExeSQL.Prepare;
-    LExeSQL.ExecSQL;
+    
+    try
+      if not LExeSQL.Prepared then
+        LExeSQL.Prepare;
+      LExeSQL.ExecSQL;
+      LParams := LExeSQL.AsParams;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(LExeSQL.SQL.Text, E.Message, nil);
+        raise;
+      end;
+    end;
   finally
-    {$IFDEF ZEOS80UP}
-    _SetMonitorLog(LExeSQL.SQL.Text, LExeSQL.Transaction.Name, LExeSQL.Params);
-    {$ELSE}
-    _SetMonitorLog(LExeSQL.SQL.Text, 'DEFAULT', LExeSQL.Params);
-    {$ENDIF}
-    FRowsAffected := LExeSQL.RowsAffected;
-    LExeSQL.Free;
+    if Assigned(LExeSQL) then
+    begin
+      if LExeSQL.Active then
+        LExeSQL.Close;
+      {$IFDEF ZEOS80UP}
+      _SetMonitorLog(LExeSQL.SQL.Text, LExeSQL.Transaction.Name, LParams);
+      {$ELSE}
+      _SetMonitorLog(LExeSQL.SQL.Text, 'DEFAULT', LParams);
+      {$ENDIF}
+      LExeSQL.Free;
+    end;
+    if Assigned(LParams) then
+    begin
+      LParams.Clear;
+      LParams.Free;
+    end;
   end;
 end;
 
-{ TDriverResultSetZeos }
+{ TDriverDataSetZeos }
 
-procedure TDriverResultSetZeos.ApplyUpdates;
+procedure TDriverDataSetZeos.ApplyUpdates;
 begin
   FDataSet.ApplyUpdates;
 end;
 
-procedure TDriverResultSetZeos.CancelUpdates;
+procedure TDriverDataSetZeos.CancelUpdates;
 begin
   FDataSet.CancelUpdates;
 end;
 
-constructor TDriverResultSetZeos.Create(const ADataSet: TZQuery; const AMonitor: ICommandMonitor;
+constructor TDriverDataSetZeos.Create(const ADataSet: TZQuery;
       const AMonitorCallback: TMonitorProc);
 begin
-  inherited Create(ADataSet, AMonitor, AMonitorCallback);
+  inherited Create(ADataSet, AMonitorCallback);
 end;
 
-destructor TDriverResultSetZeos.Destroy;
+destructor TDriverDataSetZeos.Destroy;
 begin
-  FDataSet.Free;
   inherited;
 end;
 
-function TDriverResultSetZeos.GetFieldValue(const AFieldName: String): Variant;
-var
-  LField: TField;
-begin
-  LField := FDataSet.FieldByName(AFieldName);
-  Result := GetFieldValue(LField.Index);
-end;
-
-function TDriverResultSetZeos.GetField(const AFieldName: String): TField;
-begin
-  Result := FDataSet.FieldByName(AFieldName);
-end;
-
-function TDriverResultSetZeos.GetFieldType(const AFieldName: String): TFieldType;
-begin
-  Result := FDataSet.FieldByName(AFieldName).DataType;
-end;
-
-function TDriverResultSetZeos.GetFieldValue(const AFieldIndex: UInt16): Variant;
-begin
-  if AFieldIndex > FDataSet.FieldCount - 1  then
-    Exit(Variants.Null);
-
-  if FDataSet.Fields[AFieldIndex].IsNull then
-     Result := Variants.Null
-  else
-  begin
-    case FDataSet.Fields[AFieldIndex].DataType of
-      ftString,
-      ftWideString: Result := FDataSet.Fields[AFieldIndex].AsString;
-    else
-      Result := FDataSet.Fields[AFieldIndex].Value;
-    end;
-  end;
-end;
-
-function TDriverResultSetZeos.IsCachedUpdates: Boolean;
+function TDriverDataSetZeos.IsCachedUpdates: Boolean;
 begin
   Result := FDataSet.CachedUpdates;
 end;
 
-function TDriverResultSetZeos.IsReadOnly: Boolean;
+function TDriverDataSetZeos.IsReadOnly: Boolean;
 begin
   Result := FDataSet.ReadOnly;
 end;
 
-function TDriverResultSetZeos.IsUniDirectional: Boolean;
+function TDriverDataSetZeos.IsUniDirectional: Boolean;
 begin
   Result := FDataSet.IsUniDirectional;
 end;
 
-function TDriverResultSetZeos.NotEof: Boolean;
+procedure TDriverDataSetZeos.Open;
+var
+  LParams: TParams;
 begin
-  if not FFirstNext then
-    FFirstNext := True
-  else
-    FDataSet.Next;
-  Result := not FDataSet.Eof;
-end;
-
-procedure TDriverResultSetZeos.Open;
-begin
+  LParams := nil;
   try
     inherited Open;
+    LParams := FDataSet.AsParams;
   finally
     {$IFDEF ZEOS80UP}
-    _SetMonitorLog(FDataSet.SQL.Text, FDataSet.Transaction.Name, FDataSet.Params);
+    _SetMonitorLog(FDataSet.SQL.Text, FDataSet.Transaction.Name, LParams);
     {$ELSE}
-    _SetMonitorLog(FDataSet.SQL.Text, 'DEFAULT', FDataSet.Params);
+    _SetMonitorLog(FDataSet.SQL.Text, 'DEFAULT', LParams);
     {$ENDIF}
+    if Assigned(LParams) then
+    begin
+      LParams.Clear;
+      LParams.Free;
+    end;
   end;
 end;
 
-function TDriverResultSetZeos.RowsAffected: UInt32;
+function TDriverDataSetZeos.RowsAffected: UInt32;
 begin
   Result := FDataSet.RowsAffected;
 end;
 
-function TDriverResultSetZeos._GetCommandText: String;
+function TDriverDataSetZeos._GetCommandText: String;
 begin
   Result := FDataSet.SQL.Text;
 end;
 
-procedure TDriverResultSetZeos._SetCachedUpdates(const Value: Boolean);
+procedure TDriverDataSetZeos._SetCachedUpdates(const Value: Boolean);
 begin
   FDataSet.CachedUpdates := Value;
 end;
 
-procedure TDriverResultSetZeos._SetCommandText(const ACommandText: String);
+procedure TDriverDataSetZeos._SetCommandText(const ACommandText: String);
 begin
   FDataSet.SQL.Text := ACommandText;
 end;
 
-procedure TDriverResultSetZeos._SetReadOnly(const Value: Boolean);
+procedure TDriverDataSetZeos._SetReadOnly(const Value: Boolean);
 begin
   FDataSet.ReadOnly := Value;
 end;
 
-procedure TDriverResultSetZeos._SetUniDirectional(const Value: Boolean);
+procedure TDriverDataSetZeos._SetUniDirectional(const Value: Boolean);
 begin
-  TDataSetHacker(FDataSet).SetUniDirectional(Value);
 end;
 
 end.

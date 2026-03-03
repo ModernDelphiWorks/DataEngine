@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverNexusDBTransaction;
@@ -29,18 +18,18 @@ interface
 uses
   Classes,
   DB,
+  SysUtils,
+  Generics.Collections,
   nxdb,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com dbExpress
   TDriverNexusDBTransaction = class(TDriverTransaction)
   protected
     FConnection: TnxDatabase;
   public
-    constructor Create(AConnection: TComponent); override;
+    constructor Create(const AConnection: TComponent); override;
     destructor Destroy; override;
     procedure StartTransaction; override;
     procedure Commit; override;
@@ -52,9 +41,14 @@ implementation
 
 { TDriverNexusDBTransaction }
 
-constructor TDriverNexusDBTransaction.Create(AConnection: TComponent);
+constructor TDriverNexusDBTransaction.Create(const AConnection: TComponent);
 begin
+  inherited;
   FConnection := AConnection as TnxDatabase;
+  // NexusDB manages transactions on the database component itself
+  // We register the connection as the default transaction object
+  FTransactionList.Add('DEFAULT', FConnection); 
+  FTransactionActive := FConnection;
 end;
 
 destructor TDriverNexusDBTransaction.Destroy;
@@ -65,24 +59,25 @@ end;
 
 function TDriverNexusDBTransaction.InTransaction: Boolean;
 begin
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
+    
   Result := FConnection.InTransaction;
 end;
 
 procedure TDriverNexusDBTransaction.StartTransaction;
 begin
-  inherited;
-  FConnection.StartTransaction;
+  if not FConnection.InTransaction then
+    FConnection.StartTransaction;
 end;
 
 procedure TDriverNexusDBTransaction.Commit;
 begin
-  inherited;
   FConnection.Commit;
 end;
 
 procedure TDriverNexusDBTransaction.Rollback;
 begin
-  inherited;
   FConnection.Rollback;
 end;
 

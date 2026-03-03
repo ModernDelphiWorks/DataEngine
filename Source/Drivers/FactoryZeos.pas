@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit FactoryZeos;
@@ -31,21 +20,20 @@ uses
   Classes,
   SysUtils,
   ZConnection,
-  // DBE
-  DBE.FactoryConnection,
-  DBE.FactoryInterfaces;
+  ZAbstractConnection,
+  FactoryConnection,
+  FactoryInterfaces;
 
 type
-  // Fábrica de conexão concreta com dbExpress
   TFactoryZeos = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TZConnection;
-      const ADriverName: TDriverName); overload;
+      const ADriver: TDBEngineDriver); overload;
     constructor Create(const AConnection: TZConnection;
-      const ADriverName: TDriverName;
+      const ADriver: TDBEngineDriver;
       const AMonitor: ICommandMonitor); overload;
     constructor Create(const AConnection: TZConnection;
-      const ADriverName: TDriverName;
+      const ADriver: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -54,44 +42,34 @@ type
 implementation
 
 uses
-  dbe.driver.zeos,
-  dbe.driver.zeos.transaction;
+  DriverZeos,
+  DriverZeosTransaction;
 
 { TFactoryZeos }
 
 constructor TFactoryZeos.Create(const AConnection: TZConnection;
-  const ADriverName: TDriverName);
+  const ADriver: TDBEngineDriver);
 begin
   FDriverTransaction := TDriverZeosTransaction.Create(AConnection);
   FDriverConnection  := TDriverZeos.Create(AConnection,
                                            FDriverTransaction,
-                                           ADriverName,
-                                           FCommandMonitor,
+                                           ADriver,
                                            FMonitorCallback);
   FAutoTransaction := False;
 end;
 
 constructor TFactoryZeos.Create(const AConnection: TZConnection;
-  const ADriverName: TDriverName; const AMonitor: ICommandMonitor);
+  const ADriver: TDBEngineDriver; const AMonitor: ICommandMonitor);
 begin
-  Create(AConnection, ADriverName);
   FCommandMonitor := AMonitor;
-end;
-
-procedure TFactoryZeos.AddTransaction(const AKey: String;
-  const ATransaction: TComponent);
-begin
-  if not (ATransaction is TZConnection) then
-    raise Exception.Create('Invalid transaction type. Expected TZConnection.');
-
-  inherited AddTransaction(AKey, ATransaction);
+  Create(AConnection, ADriver);
 end;
 
 constructor TFactoryZeos.Create(const AConnection: TZConnection;
-  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
+  const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
 begin
-  Create(AConnection, ADriverName);
   FMonitorCallback := AMonitorCallback;
+  Create(AConnection, ADriver);
 end;
 
 destructor TFactoryZeos.Destroy;
@@ -99,6 +77,17 @@ begin
   FDriverConnection.Free;
   FDriverTransaction.Free;
   inherited;
+end;
+
+procedure TFactoryZeos.AddTransaction(const AKey: String;
+  const ATransaction: TComponent);
+begin
+  {$IFDEF ZEOS80UP}
+  if not (ATransaction is TZTransaction) then
+    raise Exception.Create('Invalid transaction type. Expected TZTransaction.');
+  {$ENDIF}
+
+  inherited AddTransaction(AKey, ATransaction);
 end;
 
 end.

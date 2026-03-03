@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverWireMongoDBTransaction;
@@ -27,20 +16,18 @@ unit DriverWireMongoDBTransaction;
 interface
 
 uses
-  DB,
-  Classes,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces,
-  MongoWireConnection;
+  System.Classes,
+  System.SysUtils,
+  Data.DB,
+  MongoWireConnection,
+  DriverConnection;
 
 type
-  // Classe de conexão concreta com MongoWire
-  TDriverMongoWireTransaction = class(TDriverTransaction)
+  TDriverWireMongoDBTransaction = class(TDriverTransaction)
   protected
     FConnection: TMongoWireConnection;
   public
-    constructor Create(AConnection: TComponent); override;
+    constructor Create(const AConnection: TComponent); override;
     destructor Destroy; override;
     procedure StartTransaction; override;
     procedure Commit; override;
@@ -50,40 +37,60 @@ type
 
 implementation
 
-{ TDriverMongoWireTransaction }
+{ TDriverWireMongoDBTransaction }
 
-constructor TDriverMongoWireTransaction.Create(AConnection: TComponent);
+constructor TDriverWireMongoDBTransaction.Create(const AConnection: TComponent);
 begin
-  FConnection := AConnection as TMongoWireConnection;
+  inherited Create(AConnection);
+  if not (AConnection is TMongoWireConnection) then
+    raise Exception.Create('Invalid connection type. Expected TMongoWireConnection.');
+    
+  FConnection := TMongoWireConnection(AConnection);
+  // MongoWire connection acts as the transaction context
+  FTransactionList.Add('DEFAULT', FConnection);
+  FTransactionActive := FConnection;
 end;
 
-destructor TDriverMongoWireTransaction.Destroy;
+destructor TDriverWireMongoDBTransaction.Destroy;
 begin
+  FTransactionActive := nil;
   FConnection := nil;
   inherited;
 end;
 
-function TDriverMongoWireTransaction.InTransaction: Boolean;
+function TDriverWireMongoDBTransaction.InTransaction: Boolean;
 begin
-  Result := False; //FConnection.InTransaction;
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
+    
+  // MongoDB doesn't strictly support multi-statement transactions in the same way as SQL,
+  // or at least this wrapper implementation doesn't expose state.
+  // Returning False implies no active transaction state to check against.
+  Result := False; 
 end;
 
-procedure TDriverMongoWireTransaction.StartTransaction;
+procedure TDriverWireMongoDBTransaction.StartTransaction;
 begin
-  inherited;
-//  FConnection.StartTransaction;
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined.');
+
+  // No-op for MongoWire wrapper
 end;
 
-procedure TDriverMongoWireTransaction.Commit;
+procedure TDriverWireMongoDBTransaction.Commit;
 begin
-  inherited;
-//  FConnection.Commit;
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined.');
+
+  // No-op for MongoWire wrapper
 end;
 
-procedure TDriverMongoWireTransaction.Rollback;
+procedure TDriverWireMongoDBTransaction.Rollback;
 begin
-  inherited;
-//  FConnection.Rollback;
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined.');
+
+  // No-op for MongoWire wrapper
 end;
 
 end.

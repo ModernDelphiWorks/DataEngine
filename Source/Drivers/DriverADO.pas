@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverADO;
@@ -32,8 +21,8 @@ uses
   DB,
   Variants,
   ADODB,
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
   TDriverADO = class(TDriverConnection)
@@ -43,46 +32,44 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDriverName;
-      const AMonitor: ICommandMonitor;
+      const ADriverName: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
-    procedure ExecuteDirect(const ASQL: String); overload; override;
+    procedure ExecuteDirect(const ASQL: String); override;
     procedure ExecuteDirect(const ASQL: String;
-      const AParams: TParams); overload; override;
+      const AParams: TParams); override;
     procedure ExecuteScript(const AScript: String); override;
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
     function IsConnected: Boolean; override;
     function CreateQuery: IDBQuery; override;
-    function CreateDataSet(const ASQL: String): IDBResultSet; override;
+    function CreateDataSet(const ASQL: String): IDBDataSet; override;
   end;
 
   TDriverQueryADO = class(TDriverQuery)
   private
-    FSQLQuery: TADOQuery;
+    FADOQuery: TADOQuery;
   protected
     procedure _SetCommandText(const ACommandText: String); override;
     function _GetCommandText: String; override;
   public
-    constructor Create(AConnection: TADOConnection);
+    constructor Create(const AConnection: TADOConnection;
+      const ADriverTransaction: TDriverTransaction;
+      const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
+    function RowsAffected: UInt32; override;
   end;
 
-  TDriverResultSetADO = class(TDriverResultSet<TADOQuery>)
+  TDriverDataSetADO = class(TDriverDataSet<TADOQuery>)
   public
-    constructor Create(const ADataSet: TADOQuery; const AMonitor: ICommandMonitor;
-      const AMonitorCallback: TMonitorProc); override;
+    constructor Create(const ADataSet: TADOQuery; const AMonitorCallback: TMonitorProc); reintroduce;
     destructor Destroy; override;
-    function NotEof: Boolean; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; overload; override;
-    function GetField(const AFieldName: String): TField; override;
+    procedure Open; override;
+    function RowsAffected: UInt32; override;
   end;
 
 implementation
@@ -98,83 +85,156 @@ end;
 
 procedure TDriverADO.Disconnect;
 begin
-  inherited;
   FConnection.Connected := False;
 end;
 
 procedure TDriverADO.ExecuteDirect(const ASQL: String);
+var
+  LExeSQL: TADOQuery;
+  LParams: TParams;
 begin
-  inherited;
-  FConnection.Execute(ASQL);
+  LExeSQL := TADOQuery.Create(nil);
+  LParams := nil;
+  try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+      
+    LExeSQL.Connection := FConnection;
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+    LExeSQL.SQL.Text := ASQL;
+    try
+      LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error during direct execution', E.Message, nil);
+        raise;
+      end;
+    end;
+  finally
+    if Assigned(LExeSQL) then
+    begin
+      _SetMonitorLog(LExeSQL.SQL.Text, '', LParams);
+      LExeSQL.Free;
+    end;
+    if Assigned(LParams) then
+    begin
+      LParams.Clear;
+      LParams.Free;
+    end;
+  end;
 end;
 
 procedure TDriverADO.ExecuteDirect(const ASQL: String; const AParams: TParams);
 var
   LExeSQL: TADOQuery;
+  LParams: TParams;
   LFor: Int16;
 begin
   LExeSQL := TADOQuery.Create(nil);
+  LParams := nil;
   try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+
     LExeSQL.Connection := FConnection;
-    LExeSQL.SQL.Text   := ASQL;
-    for LFor := 0 to AParams.Count - 1 do
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+    LExeSQL.SQL.Text := ASQL;
+    if AParams.Count > 0 then
     begin
-      LExeSQL.Parameters.ParamByName(AParams[LFor].Name).DataType := AParams[LFor].DataType;
-      LExeSQL.Parameters.ParamByName(AParams[LFor].Name).Value    := AParams[LFor].Value;
+      for LFor := 0 to AParams.Count - 1 do
+      begin
+        if not Assigned(AParams[LFor]) then
+          raise Exception.Create(Format('Parameter "%s" is invalid or unassigned.', [AParams[LFor].Name]));
+          
+        LExeSQL.Parameters.ParamByName(AParams[LFor].Name).DataType := AParams[LFor].DataType;
+        LExeSQL.Parameters.ParamByName(AParams[LFor].Name).Value    := AParams[LFor].Value;
+      end;
     end;
+    
     try
       LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
     except
-      raise;
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error during direct execution', E.Message, nil);
+        raise;
+      end;
     end;
   finally
-    LExeSQL.Free;
+    if Assigned(LExeSQL) then
+    begin
+      _SetMonitorLog(LExeSQL.SQL.Text, '', LParams);
+      LExeSQL.Free;
+    end;
+    if Assigned(LParams) then
+    begin
+      LParams.Clear;
+      LParams.Free;
+    end;
   end;
 end;
 
 procedure TDriverADO.ExecuteScript(const AScript: String);
 begin
-  inherited;
-  FSQLScript.SQL.Text := AScript;
-  FSQLScript.ExecSQL;
+  AddScript(AScript);
+  ExecuteScripts;
 end;
 
 procedure TDriverADO.ExecuteScripts;
 begin
-  inherited;
   try
     FSQLScript.ExecSQL;
-  finally
-    FSQLScript.SQL.Clear;
+    FRowsAffected := FSQLScript.RowsAffected;
+    _SetMonitorLog(FSQLScript.SQL.Text, '', nil);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog('Error executing script', E.Message, nil);
+      raise;
+    end;
   end;
+  FSQLScript.SQL.Clear;
 end;
 
 procedure TDriverADO.AddScript(const AScript: String);
 begin
-  inherited;
   FSQLScript.SQL.Add(AScript);
 end;
 
 procedure TDriverADO.Connect;
 begin
-  inherited;
   FConnection.Connected := True;
 end;
 
 function TDriverADO.IsConnected: Boolean;
 begin
-  inherited;
-  Result := FConnection.Connected = True;
+  Result := FConnection.Connected;
 end;
 
 constructor TDriverADO.Create(const AConnection: TComponent;
-  const ADriverTransaction: TDriverTransaction; const ADriverName: TDriverName;
-  const AMonitor: ICommandMonitor; const AMonitorCallback: TMonitorProc);
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc);
 begin
   FConnection := AConnection as TADOConnection;
   FDriverTransaction := ADriverTransaction;
-  FDriverName := ADriverName;
-  FCommandMonitor := AMonitor;
+  FDriver := ADriverName;
   FMonitorCallback := AMonitorCallback;
   FSQLScript := TADOQuery.Create(nil);
   try
@@ -187,130 +247,191 @@ end;
 
 function TDriverADO.CreateQuery: IDBQuery;
 begin
-  Result := TDriverQueryADO.Create(FConnection);
+  Result := TDriverQueryADO.Create(FConnection, FDriverTransaction, FMonitorCallback);
 end;
 
-function TDriverADO.CreateDataSet(const ASQL: String): IDBResultSet;
+function TDriverADO.CreateDataSet(const ASQL: String): IDBDataSet;
 var
   LDBQuery: IDBQuery;
 begin
-  LDBQuery := TDriverQueryADO.Create(FConnection);
+  LDBQuery := TDriverQueryADO.Create(FConnection, FDriverTransaction, FMonitorCallback);
   LDBQuery.CommandText := ASQL;
-  Result   := LDBQuery.ExecuteQuery;
+  Result := LDBQuery.ExecuteQuery;
 end;
 
-{ TDriverDBExpressQuery }
+{ TDriverQueryADO }
 
-constructor TDriverQueryADO.Create(AConnection: TADOConnection);
+constructor TDriverQueryADO.Create(const AConnection: TADOConnection;
+  const ADriverTransaction: TDriverTransaction;
+  const AMonitorCallback: TMonitorProc);
 begin
   if AConnection = nil then
-    Exit;
-  FSQLQuery := TADOQuery.Create(nil);
+    raise EArgumentNilException.Create('AConnection cannot be nil');
+  
+  FDriverTransaction := ADriverTransaction;
+  FMonitorCallback := AMonitorCallback;
+  FADOQuery := TADOQuery.Create(nil);
   try
-    FSQLQuery.Connection := AConnection;
+    FADOQuery.Connection := AConnection;
   except
-    FSQLQuery.Free;
+    FADOQuery.Free;
     raise;
   end;
 end;
 
 destructor TDriverQueryADO.Destroy;
 begin
-  FSQLQuery.Free;
+  FADOQuery.Free;
   inherited;
 end;
 
-function TDriverQueryADO.ExecuteQuery: IDBResultSet;
+function TDriverQueryADO.ExecuteQuery: IDBDataSet;
 var
-  LResultSet: TADOQuery;
+  LDataSet: TADOQuery;
+  LParams: TParams;
   LFor: Int16;
 begin
-  LResultSet := TADOQuery.Create(nil);
+  LDataSet := TADOQuery.Create(nil);
+  LParams := nil; // TADOQuery doesn't easily convert to TParams without helper, leaving nil for now or implementing conversion if needed
   try
-    LResultSet.Connection := FSQLQuery.Connection;
-    LResultSet.SQL.Text := FSQLQuery.SQL.Text;
-
-    for LFor := 0 to FSQLQuery.Parameters.Count - 1 do
-    begin
-      LResultSet.Parameters[LFor].DataType := FSQLQuery.Parameters[LFor].DataType;
-      LResultSet.Parameters[LFor].Value    := FSQLQuery.Parameters[LFor].Value;
+    if not Assigned(FADOQuery.Connection) then
+      raise Exception.Create('Connection not assigned.');
+      
+    LDataSet.Connection := FADOQuery.Connection;
+    LDataSet.SQL.Text := FADOQuery.SQL.Text;
+    
+    try
+      if FADOQuery.Parameters.Count > 0 then
+      begin
+        for LFor := 0 to FADOQuery.Parameters.Count - 1 do
+        begin
+           LDataSet.Parameters[LFor].DataType := FADOQuery.Parameters[LFor].DataType;
+           LDataSet.Parameters[LFor].Value    := FADOQuery.Parameters[LFor].Value;
+        end;
+      end;
+      
+      if LDataSet.SQL.Text = '' then
+        raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+        
+      LDataSet.Open;
+      Result := TDriverDataSetADO.Create(LDataSet, FMonitorCallback);
+      if LDataSet.Active then
+      begin
+         if LDataSet.RecordCount = 0 then
+           Result.FetchingAll := True;
+      end;
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(LDataSet.SQL.Text, E.Message, nil);
+        FreeAndNil(LDataSet);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error', E.Message, nil);
+        FreeAndNil(LDataSet);
+        raise;
+      end;
     end;
-    LResultSet.Open;
-  except
-    LResultSet.Free;
-    raise;
+  finally
+    if Assigned(LDataSet) and (not Assigned(Result)) then // Only free if we didn't pass ownership to Result
+       LDataSet.Free; 
+       
+    // Note: If Result IS created, it owns LDataSet, so we don't free it here.
+    // However, if we want to log, we should do it before.
+    // The FireDAC implementation closes LDataSet in finally if it was local, but here LDataSet is passed to TDriverDataSetADO.
+    // TDriverDataSetFireDAC takes ownership? TDriverDataSet<T> takes ownership in constructor.
+    // So if Result is created, LDataSet is owned by it.
   end;
-  Result := TDriverResultSetADO.Create(LResultSet, FCommandMonitor, FMonitorCallback);
-  if LResultSet.RecordCount = 0 then
-     Result.FetchingAll := True;
+end;
+
+function TDriverQueryADO.RowsAffected: UInt32;
+begin
+  Result := FRowsAffected;
 end;
 
 function TDriverQueryADO._GetCommandText: String;
 begin
-  Result := FSQLQuery.SQL.Text;
+  Result := FADOQuery.SQL.Text;
 end;
 
 procedure TDriverQueryADO._SetCommandText(const ACommandText: String);
 begin
-  FSQLQuery.SQL.Text := ACommandText;
+  FADOQuery.SQL.Text := ACommandText;
 end;
 
 procedure TDriverQueryADO.ExecuteDirect;
+var
+  LExeSQL: TADOQuery;
+  LFor: Int16;
 begin
-  FSQLQuery.ExecSQL;
+  LExeSQL := TADOQuery.Create(nil);
+  try
+    if not Assigned(FADOQuery.Connection) then
+      raise Exception.Create('Connection not assigned.');
+
+    LExeSQL.Connection := FADOQuery.Connection;
+    LExeSQL.SQL.Text := FADOQuery.SQL.Text;
+    
+    if FADOQuery.Parameters.Count > 0 then
+    begin
+      for LFor := 0 to FADOQuery.Parameters.Count - 1 do
+      begin
+        LExeSQL.Parameters[LFor].DataType := FADOQuery.Parameters[LFor].DataType;
+        LExeSQL.Parameters[LFor].Value    := FADOQuery.Parameters[LFor].Value;
+      end;
+    end;
+    
+    try
+      LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(LExeSQL.SQL.Text, E.Message, nil);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error', E.Message, nil);
+        raise;
+      end;
+    end;
+  finally
+    if Assigned(LExeSQL) then
+    begin
+      _SetMonitorLog(LExeSQL.SQL.Text, '', nil);
+      LExeSQL.Free;
+    end;
+  end;
 end;
 
-{ TDriverResultSetADO }
+{ TDriverDataSetADO }
 
-constructor TDriverResultSetADO.Create(const ADataSet: TADOQuery; const AMonitor: ICommandMonitor;
+constructor TDriverDataSetADO.Create(const ADataSet: TADOQuery;
   const AMonitorCallback: TMonitorProc);
 begin
-  inherited Create(ADataSet, AMonitor, AMonitorCallback);
+  inherited Create(ADataSet, AMonitorCallback);
 end;
 
-destructor TDriverResultSetADO.Destroy;
+destructor TDriverDataSetADO.Destroy;
 begin
-  FDataSet.Free;
   inherited;
 end;
 
-function TDriverResultSetADO.GetFieldValue(const AFieldName: String): Variant;
-var
-  LField: TField;
+procedure TDriverDataSetADO.Open;
 begin
-  LField := FDataSet.FieldByName(AFieldName);
-  Result := GetFieldValue(LField.Index);
+  try
+    inherited Open;
+  finally
+    _SetMonitorLog(FDataSet.SQL.Text, '', nil);
+  end;
 end;
 
-function TDriverResultSetADO.GetField(const AFieldName: String): TField;
+function TDriverDataSetADO.RowsAffected: UInt32;
 begin
-  Result := FDataSet.FieldByName(AFieldName);
-end;
-
-function TDriverResultSetADO.GetFieldType(const AFieldName: String): TFieldType;
-begin
-  Result := FDataSet.FieldByName(AFieldName).DataType;
-end;
-
-function TDriverResultSetADO.GetFieldValue(const AFieldIndex: UInt16): Variant;
-begin
-  if AFieldIndex > FDataSet.FieldCount -1  then
-    Exit(Variants.Null);
-
-  if FDataSet.Fields[AFieldIndex].IsNull then
-     Result := Variants.Null
-  else
-     Result := FDataSet.Fields[AFieldIndex].Value;
-end;
-
-function TDriverResultSetADO.NotEof: Boolean;
-begin
-  if not FFirstNext then
-     FFirstNext := True
-  else
-     FDataSet.Next;
-
-  Result := not FDataSet.Eof;
+  Result := FDataSet.RowsAffected;
 end;
 
 end.

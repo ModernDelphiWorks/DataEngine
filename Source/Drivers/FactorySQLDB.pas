@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit FactorySQLDB;
@@ -27,25 +16,24 @@ unit FactorySQLDB;
 interface
 
 uses
-  DB,
-  Classes,
-  SysUtils,
+  System.Classes,
+  System.SysUtils,
+  Data.DB,
   SQLDB,
-  // DBE
-  DBE.FactoryConnection,
-  DBE.FactoryInterfaces;
+  FactoryConnection,
+  FactoryInterfaces,
+  DriverConnection;
 
 type
-  // Fábrica de conexão concreta com SQLDB
   TFactorySQLdb = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TSQLConnection;
-      const ADriverName: TDriverName); overload;
+      const ADriverName: TDBEngineDriver); overload;
     constructor Create(const AConnection: TSQLConnection;
-      const ADriverName: TDriverName;
+      const ADriverName: TDBEngineDriver;
       const AMonitor: ICommandMonitor); overload;
     constructor Create(const AConnection: TSQLConnection;
-      const ADriverName: TDriverName;
+      const ADriverName: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -54,28 +42,46 @@ type
 implementation
 
 uses
-  DBE.DriverFireDac,
-  DBE.DriverFireDacTransaction;
+  DriverSQLDB,
+  DriverSQLDBTransaction;
 
-{ TFactoryFireDAC }
+{ TFactorySQLdb }
 
 constructor TFactorySQLdb.Create(const AConnection: TSQLConnection;
-  const ADriverName: TDriverName);
+  const ADriverName: TDBEngineDriver);
 begin
-  FDriverTransaction := TDriverFireDACTransaction.Create(AConnection);
-  FDriverConnection  := TDriverFireDAC.Create(AConnection,
-                                              FDriverTransaction,
-                                              ADriverName,
-                                              FCommandMonitor,
-                                              FMonitorCallback);
+  FDriverTransaction := TDriverSQLdbTransaction.Create(AConnection);
+  FDriverConnection  := TDriverSQLdb.Create(AConnection,
+                                            FDriverTransaction,
+                                            ADriverName,
+                                            nil);
   FAutoTransaction := False;
 end;
 
 constructor TFactorySQLdb.Create(const AConnection: TSQLConnection;
-  const ADriverName: TDriverName; const AMonitor: ICommandMonitor);
+  const ADriverName: TDBEngineDriver; const AMonitor: ICommandMonitor);
 begin
   FCommandMonitor := AMonitor;
   Create(AConnection, ADriverName);
+end;
+
+constructor TFactorySQLdb.Create(const AConnection: TSQLConnection;
+  const ADriverName: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+begin
+  FDriverTransaction := TDriverSQLdbTransaction.Create(AConnection);
+  FDriverConnection  := TDriverSQLdb.Create(AConnection,
+                                            FDriverTransaction,
+                                            ADriverName,
+                                            AMonitorCallback);
+  FMonitorCallback := AMonitorCallback;
+  FAutoTransaction := False;
+end;
+
+destructor TFactorySQLdb.Destroy;
+begin
+  FreeAndNil(FDriverConnection);
+  FreeAndNil(FDriverTransaction);
+  inherited;
 end;
 
 procedure TFactorySQLdb.AddTransaction(const AKey: String;
@@ -85,20 +91,6 @@ begin
     raise Exception.Create('Invalid transaction type. Expected TSQLTransaction.');
 
   inherited AddTransaction(AKey, ATransaction);
-end;
-
-constructor TFactorySQLdb.Create(const AConnection: TSQLConnection;
-  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
-begin
-  FMonitorCallback := AMonitorCallback;
-  Create(AConnection, ADriverName);
-end;
-
-destructor TFactorySQLdb.Destroy;
-begin
-  FDriverConnection.Free;
-  FDriverTransaction.Free;
-  inherited;
 end;
 
 end.

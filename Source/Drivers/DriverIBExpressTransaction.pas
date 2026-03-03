@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverIBExpressTransaction;
@@ -29,19 +18,19 @@ interface
 uses
   Classes,
   DB,
+  SysUtils,
+  Generics.Collections,
   IBDatabase,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com dbExpress
   TDriverIBExpressTransaction = class(TDriverTransaction)
   protected
     FConnection: TIBDatabase;
-    FTransaction: TIBTransaction;
+    FInternalTransaction: TIBTransaction; // Only used if we create it
   public
-    constructor Create(AConnection: TComponent); override;
+    constructor Create(const AConnection: TComponent); override;
     destructor Destroy; override;
     procedure StartTransaction; override;
     procedure Commit; override;
@@ -53,46 +42,70 @@ implementation
 
 { TDriverIBExpressTransaction }
 
-constructor TDriverIBExpressTransaction.Create(AConnection: TComponent);
+constructor TDriverIBExpressTransaction.Create(const AConnection: TComponent);
+var
+  LTransaction: TIBTransaction;
 begin
+  inherited;
   FConnection := AConnection as TIBDatabase;
-  FTransaction := TIBTransaction.Create(nil);
-  FTransaction.DefaultDatabase := FConnection;
-  FTransaction.AutoStopAction := saCommit;
-  FConnection.DefaultTransaction := FTransaction;
+  FInternalTransaction := nil;
+  
+  if FConnection.DefaultTransaction <> nil then
+  begin
+     LTransaction := FConnection.DefaultTransaction;
+  end
+  else
+  begin
+    FInternalTransaction := TIBTransaction.Create(nil);
+    FInternalTransaction.DefaultDatabase := FConnection;
+    FInternalTransaction.AutoStopAction := saCommit;
+    FConnection.DefaultTransaction := FInternalTransaction;
+    LTransaction := FInternalTransaction;
+  end;
+  
+  if LTransaction.Name = EmptyStr then
+    LTransaction.Name := 'DEFAULT';
+
+  FTransactionList.Add(UpperCase(LTransaction.Name), LTransaction);
+  FTransactionActive := LTransaction;
 end;
 
 destructor TDriverIBExpressTransaction.Destroy;
 begin
-  FTransaction.Free;
+  if Assigned(FInternalTransaction) then
+  begin
+    if FConnection.DefaultTransaction = FInternalTransaction then
+      FConnection.DefaultTransaction := nil;
+    FInternalTransaction.Free;
+  end;
+  FInternalTransaction := nil;
+  FTransactionActive := nil;
   FConnection := nil;
   inherited;
 end;
 
-function TDriverIBExpressTransaction.InTransaction: Boolean;
-begin
-  Result := FTransaction.InTransaction;
-end;
-
 procedure TDriverIBExpressTransaction.StartTransaction;
 begin
-  inherited;
   FConnection.Connected := True;
-
-  if not FTransaction.InTransaction then
-    FTransaction.StartTransaction;
+  (FTransactionActive as TIBTransaction).StartTransaction;
 end;
 
 procedure TDriverIBExpressTransaction.Commit;
 begin
-  inherited;
-  FTransaction.Commit;
+  (FTransactionActive as TIBTransaction).Commit;
 end;
 
 procedure TDriverIBExpressTransaction.Rollback;
 begin
-  inherited;
-  FTransaction.Rollback;
+  (FTransactionActive as TIBTransaction).Rollback;
+end;
+
+function TDriverIBExpressTransaction.InTransaction: Boolean;
+begin
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
+    
+  Result := (FTransactionActive as TIBTransaction).InTransaction;
 end;
 
 end.

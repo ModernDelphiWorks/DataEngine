@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverNexusDB;
@@ -31,22 +20,23 @@ uses
   DB,
   Variants,
   StrUtils,
-
+  SysUtils,
   nxdb,
   nxllComponent,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com NexusDB
   TDriverNexusDB = class(TDriverConnection)
   protected
     FConnection: TnxDatabase;
     FSQLScript: TnxQuery;
+    function _GetTransactionActive: TComponent;
   public
     constructor Create(const AConnection: TComponent;
-      const ADriverName: TDriverName); override;
+      const ADriverTransaction: TDriverTransaction;
+      const ADriverName: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
@@ -56,33 +46,45 @@ type
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
     function IsConnected: Boolean; override;
-    function InTransaction: Boolean; override;
     function CreateQuery: IDBQuery; override;
-    function CreateDataSet(const ASQL: String): IDBResultSet; override;
+    function CreateDataSet(const ASQL: String = ''): IDBDataSet; override;
+    function GetSQLScripts: String; override;
   end;
 
-  TDriverQueryFireDAC = class(TDriverQuery)
+  TDriverQueryNexusDB = class(TDriverQuery)
   private
-    FFDQuery: TnxQuery;
+    FnxQuery: TnxQuery;
+    function _GetTransactionActive: TComponent;
   protected
-    procedure SetCommandText(ACommandText: String); override;
-    function GetCommandText: String; override;
+    procedure _SetCommandText(const ACommandText: String); override;
+    function _GetCommandText: String; override;
   public
-    constructor Create(AConnection: TnxDatabase);
+    constructor Create(const AConnection: TnxDatabase;
+      const ADriverTransaction: TDriverTransaction;
+      const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
+    function RowsAffected: UInt32; override;
   end;
 
-  TDriverResultSetFireDAC = class(TDriverResultSet<TnxQuery>)
+  TDriverDataSetNexusDB = class(TDriverDataSet<TnxQuery>)
+  protected
+    procedure _SetUniDirectional(const Value: Boolean); override;
+    procedure _SetReadOnly(const Value: Boolean); override;
+    procedure _SetCachedUpdates(const Value: Boolean); override;
+    procedure _SetCommandText(const ACommandText: String); override;
+    function _GetCommandText: String; override;
   public
-    constructor Create(ADataSet: TnxQuery); override;
+    constructor Create(const ADataSet: TnxQuery; const AMonitorCallback: TMonitorProc); reintroduce;
     destructor Destroy; override;
-    function NotEof: Boolean; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; overload; override;
-    function GetField(const AFieldName: String): TField; override;
+    procedure Open; override;
+    procedure ApplyUpdates; override;
+    procedure CancelUpdates; override;
+    function RowsAffected: UInt32; override;
+    function IsUniDirectional: Boolean; override;
+    function IsReadOnly: Boolean; override;
+    function IsCachedUpdates: Boolean; override;
   end;
 
 implementation
@@ -90,11 +92,14 @@ implementation
 { TDriverNexusDB }
 
 constructor TDriverNexusDB.Create(const AConnection: TComponent;
-  const ADriverName: TDriverName);
+  const ADriverTransaction: TDriverTransaction;
+  const ADriverName: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc);
 begin
-  inherited;
   FConnection := AConnection as TnxDatabase;
-  FDriverName := ADriverName;
+  FDriverTransaction := ADriverTransaction;
+  FDriver := ADriverName;
+  FMonitorCallback := AMonitorCallback;
   FSQLScript := TnxQuery.Create(nil);
   try
     FSQLScript.Session := FConnection.Session;
@@ -114,14 +119,33 @@ end;
 
 procedure TDriverNexusDB.Disconnect;
 begin
-  inherited;
   FConnection.Connected := False;
+end;
+
+function TDriverNexusDB._GetTransactionActive: TComponent;
+begin
+  Result := FDriverTransaction.TransactionActive;
 end;
 
 procedure TDriverNexusDB.ExecuteDirect(const ASQL: String);
 begin
-  inherited;
-  FConnection.ExecQuery(ASQL, []);
+  if not Assigned(FConnection) then
+    raise Exception.Create('Connection not assigned.');
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+  if ASQL = '' then
+    raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+  try
+    FConnection.ExecQuery(ASQL, []);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog(ASQL, E.Message, nil);
+      raise;
+    end;
+  end;
+  _SetMonitorLog(ASQL, 'DEFAULT', nil);
 end;
 
 procedure TDriverNexusDB.ExecuteDirect(const ASQL: String; const AParams: TParams);
@@ -129,6 +153,13 @@ var
   LExeSQL: TnxQuery;
   LFor: UInt16;
 begin
+  if not Assigned(FConnection) then
+    raise Exception.Create('Connection not assigned.');
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+  if ASQL = '' then
+    raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
   LExeSQL := TnxQuery.Create(nil);
   try
     LExeSQL.Session := FConnection.Session;
@@ -142,190 +173,284 @@ begin
     try
       LExeSQL.Prepare;
       LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
     except
-      raise;
+      on E: Exception do
+      begin
+        _SetMonitorLog(ASQL, E.Message, LExeSQL.Params);
+        raise;
+      end;
     end;
   finally
+    _SetMonitorLog(LExeSQL.SQL.Text, 'DEFAULT', LExeSQL.Params);
     LExeSQL.Free;
   end;
 end;
 
 procedure TDriverNexusDB.ExecuteScript(const AScript: String);
 begin
-  inherited;
-  FSQLScript.SQL.Text := AScript;
-  FSQLScript.ExecSQL;
+  AddScript(AScript);
+  ExecuteScripts;
 end;
 
 procedure TDriverNexusDB.ExecuteScripts;
 begin
-  inherited;
+  if FSQLScript.SQL.Count = 0 then
+    raise Exception.Create('No SQL scripts found to execute.');
+
   FConnection.Connected := True;
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
   try
-    if FSQLScript.SQL.Count > 0 then
-    begin
-      try
-        FSQLScript.ExecSQL;
-      finally
-        FSQLScript.SQL.Clear;
+    try
+      FSQLScript.ExecSQL;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog('Error during script execution', E.Message, nil);
+        raise;
       end;
     end;
   finally
-    FConnection.Connected := False;
+    _SetMonitorLog(FSQLScript.SQL.Text, 'DEFAULT', nil);
+    FSQLScript.SQL.Clear;
   end;
 end;
 
 procedure TDriverNexusDB.AddScript(const AScript: String);
 begin
-  inherited;
   FSQLScript.SQL.Add(AScript);
+end;
+
+function TDriverNexusDB.GetSQLScripts: String;
+begin
+  Result := 'Transaction: ' + 'DEFAULT' + ' ' +  FSQLScript.SQL.Text;
 end;
 
 procedure TDriverNexusDB.Connect;
 begin
-  inherited;
   FConnection.Connected := True;
-end;
-
-function TDriverNexusDB.InTransaction: Boolean;
-begin
-  Result := FConnection.InTransaction;
 end;
 
 function TDriverNexusDB.IsConnected: Boolean;
 begin
-  inherited;
   Result := FConnection.Connected;
 end;
 
 function TDriverNexusDB.CreateQuery: IDBQuery;
 begin
-  Result := TDriverQueryFireDAC.Create(FConnection);
+  Result := TDriverQueryNexusDB.Create(FConnection,
+                                       FDriverTransaction,
+                                       FMonitorCallback);
 end;
 
 function TDriverNexusDB.CreateDataSet(const ASQL: String): IDBResultSet;
 var
   LDBQuery: IDBQuery;
 begin
-  LDBQuery := TDriverQueryFireDAC.Create(FConnection);
+  LDBQuery := TDriverQueryNexusDB.Create(FConnection,
+                                         FDriverTransaction,
+                                         FMonitorCallback);
   LDBQuery.CommandText := ASQL;
   Result   := LDBQuery.ExecuteQuery;
 end;
 
-{ TDriverDBExpressQuery }
+{ TDriverQueryNexusDB }
 
-constructor TDriverQueryFireDAC.Create(AConnection: TnxDatabase);
+constructor TDriverQueryNexusDB.Create(const AConnection: TnxDatabase;
+  const ADriverTransaction: TDriverTransaction;
+  const AMonitorCallback: TMonitorProc);
 begin
   if AConnection = nil then
-    Exit;
+    raise Exception.Create('AConnection cannot be nil');
+  if ADriverTransaction = nil then
+    raise Exception.Create('ADriverTransaction cannot be nil');
 
-  FFDQuery := TnxQuery.Create(nil);
+  FDriverTransaction := ADriverTransaction;
+  FMonitorCallback := AMonitorCallback;
+  FnxQuery := TnxQuery.Create(nil);
   try
-    FFDQuery.Session := AConnection.Session;
-    FFDQuery.Database := AConnection;
+    FnxQuery.Session := AConnection.Session;
+    FnxQuery.Database := AConnection;
   except
-    FFDQuery.Free;
+    FnxQuery.Free;
     raise;
   end;
 end;
 
-destructor TDriverQueryFireDAC.Destroy;
+destructor TDriverQueryNexusDB.Destroy;
 begin
-  FFDQuery.Free;
+  FnxQuery.Free;
   inherited;
 end;
 
-function TDriverQueryFireDAC.ExecuteQuery: IDBResultSet;
+function TDriverQueryNexusDB._GetTransactionActive: TComponent;
+begin
+  Result := FDriverTransaction.TransactionActive;
+end;
+
+function TDriverQueryNexusDB.ExecuteQuery: IDBResultSet;
 var
   LResultSet: TnxQuery;
   LFor: UInt16;
 begin
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
   LResultSet := TnxQuery.Create(nil);
   try
-    LResultSet.Session := FFDQuery.Session;
-    LResultSet.Database := FFDQuery.Database;
-    LResultSet.SQL.Text   := FFDQuery.SQL.Text;
-    for LFor := 0 to FFDQuery.Params.Count - 1 do
+    LResultSet.Session := FnxQuery.Session;
+    LResultSet.Database := FnxQuery.Database;
+    LResultSet.SQL.Text   := FnxQuery.SQL.Text;
+    
+    if FnxQuery.SQL.Text = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+    for LFor := 0 to FnxQuery.Params.Count - 1 do
     begin
-      LResultSet.Params[LFor].DataType := FFDQuery.Params[LFor].DataType;
-      LResultSet.Params[LFor].Value    := FFDQuery.Params[LFor].Value;
+      LResultSet.Params[LFor].DataType := FnxQuery.Params[LFor].DataType;
+      LResultSet.Params[LFor].Value    := FnxQuery.Params[LFor].Value;
     end;
-    LResultSet.Open;
+    
+    try
+      LResultSet.Open;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(LResultSet.SQL.Text, E.Message, LResultSet.Params);
+        LResultSet.Free;
+        raise;
+      end;
+    end;
+    
+    Result := TDriverDataSetNexusDB.Create(LResultSet, FMonitorCallback);
+    if LResultSet.RecordCount = 0 then
+       Result.FetchingAll := True;
   except
-    LResultSet.Free;
-    raise;
+    on E: Exception do
+    begin
+       // If exception happened before result creation, we need to ensure LResultSet is freed if not assigned to Result
+       // But here we use try..except inside.
+       if Assigned(LResultSet) and (Result = nil) then
+         LResultSet.Free;
+       raise;
+    end;
   end;
-  Result := TDriverResultSetFireDAC.Create(LResultSet);
-  if LResultSet.RecordCount = 0 then
-     Result.FetchingAll := True;
 end;
 
-function TDriverQueryFireDAC.GetCommandText: String;
+function TDriverQueryNexusDB._GetCommandText: String;
 begin
-  Result := FFDQuery.SQL.Text;
+  Result := FnxQuery.SQL.Text;
 end;
 
-procedure TDriverQueryFireDAC.SetCommandText(ACommandText: String);
+procedure TDriverQueryNexusDB._SetCommandText(const ACommandText: String);
+begin
+  FnxQuery.SQL.Text := ACommandText;
+end;
+
+procedure TDriverQueryNexusDB.ExecuteDirect;
+begin
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+    
+  if FnxQuery.SQL.Text = '' then
+    raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+  try
+    FnxQuery.ExecSQL;
+    FRowsAffected := FnxQuery.RowsAffected;
+    _SetMonitorLog(FnxQuery.SQL.Text, 'DEFAULT', FnxQuery.Params);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog(FnxQuery.SQL.Text, E.Message, FnxQuery.Params);
+      raise;
+    end;
+  end;
+end;
+
+function TDriverQueryNexusDB.RowsAffected: UInt32;
+begin
+  Result := FRowsAffected;
+end;
+
+{ TDriverDataSetNexusDB }
+
+constructor TDriverDataSetNexusDB.Create(const ADataSet: TnxQuery;
+  const AMonitorCallback: TMonitorProc);
+begin
+  inherited Create(ADataSet, AMonitorCallback);
+end;
+
+destructor TDriverDataSetNexusDB.Destroy;
 begin
   inherited;
-  FFDQuery.SQL.Text := ACommandText;
 end;
 
-procedure TDriverQueryFireDAC.ExecuteDirect;
+procedure TDriverDataSetNexusDB.Open;
 begin
-  FFDQuery.ExecSQL;
+  try
+    inherited Open;
+  finally
+    _SetMonitorLog(FDataSet.SQL.Text, 'DEFAULT', FDataSet.Params);
+  end;
 end;
 
-{ TDriverResultSetFireDAC }
-
-constructor TDriverResultSetFireDAC.Create(ADataSet: TnxQuery);
+function TDriverDataSetNexusDB.RowsAffected: UInt32;
 begin
-  FDataSet:= ADataSet;
-  inherited;
+  Result := FDataSet.RowsAffected;
 end;
 
-destructor TDriverResultSetFireDAC.Destroy;
+function TDriverDataSetNexusDB._GetCommandText: String;
 begin
-  FDataSet.Free;
-  inherited;
+  Result := FDataSet.SQL.Text;
 end;
 
-function TDriverResultSetFireDAC.GetFieldValue(const AFieldName: String): Variant;
-var
-  LField: TField;
+procedure TDriverDataSetNexusDB._SetCachedUpdates(const Value: Boolean);
 begin
-  LField := FDataSet.FieldByName(AFieldName);
-  Result := GetFieldValue(LField.Index);
+  FDataSet.CachedUpdates := Value;
 end;
 
-function TDriverResultSetFireDAC.GetField(const AFieldName: String): TField;
+procedure TDriverDataSetNexusDB._SetCommandText(const ACommandText: String);
 begin
-  Result := FDataSet.FieldByName(AFieldName);
+  FDataSet.SQL.Text := ACommandText;
 end;
 
-function TDriverResultSetFireDAC.GetFieldType(const AFieldName: String): TFieldType;
+procedure TDriverDataSetNexusDB._SetReadOnly(const Value: Boolean);
 begin
-  Result := FDataSet.FieldByName(AFieldName).DataType;
+  FDataSet.ReadOnly := Value;
 end;
 
-function TDriverResultSetFireDAC.GetFieldValue(const AFieldIndex: Integer): Variant;
+procedure TDriverDataSetNexusDB._SetUniDirectional(const Value: Boolean);
 begin
-  if AFieldIndex > FDataSet.FieldCount -1  then
-    Exit(Variants.Null);
-
-  if FDataSet.Fields[AFieldIndex].IsNull then
-    Result := Variants.Null
-  else
-    Result := FDataSet.Fields[AFieldIndex].Value;
+  FDataSet.UniDirectional := Value;
 end;
 
-function TDriverResultSetFireDAC.NotEof: Boolean;
+procedure TDriverDataSetNexusDB.ApplyUpdates;
 begin
-  if not FFirstNext then
-    FFirstNext := True
-  else
-    FDataSet.Next;
-  Result := not FDataSet.Eof;
+  if FDataSet.CachedUpdates then
+    FDataSet.ApplyUpdates;
+end;
+
+procedure TDriverDataSetNexusDB.CancelUpdates;
+begin
+  FDataSet.CancelUpdates;
+end;
+
+function TDriverDataSetNexusDB.IsCachedUpdates: Boolean;
+begin
+  Result := FDataSet.CachedUpdates;
+end;
+
+function TDriverDataSetNexusDB.IsReadOnly: Boolean;
+begin
+  Result := FDataSet.ReadOnly;
+end;
+
+function TDriverDataSetNexusDB.IsUniDirectional: Boolean;
+begin
+  Result := FDataSet.UniDirectional;
 end;
 
 end.

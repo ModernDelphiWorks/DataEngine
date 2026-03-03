@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverIBExpress;
@@ -31,62 +20,72 @@ uses
   DB,
   Variants,
   SysUtils,
-
   IBScript,
   IBCustomDataSet,
   IBQuery,
   IBDatabase,
-
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com dbExpress
   TDriverIBExpress = class(TDriverConnection)
   protected
     FConnection: TIBDatabase;
     FSQLScript: TIBScript;
+    function _GetTransactionActive: TIBTransaction;
   public
     constructor Create(const AConnection: TComponent;
-      const ADriverName: TDriverName); override;
+      const ADriverTransaction: TDriverTransaction;
+      const ADriverName: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
-    procedure ExecuteDirect(const ASQL: String); overload; override;
-    procedure ExecuteDirect(const ASQL: String;
-      const AParams: TParams); overload; override;
+    procedure ExecuteDirect(const ASQL: String); override;
+    procedure ExecuteDirect(const ASQL: String; const AParams: TParams); override;
     procedure ExecuteScript(const AScript: String); override;
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
     function IsConnected: Boolean; override;
-    function InTransaction: Boolean; override;
     function CreateQuery: IDBQuery; override;
-    function CreateDataSet(const ASQL: String): IDBResultSet; override;
+    function CreateDataSet(const ASQL: String = ''): IDBDataSet; override;
+    function GetSQLScripts: String; override;
   end;
 
   TDriverQueryIBExpress = class(TDriverQuery)
   private
     FSQLQuery: TIBQuery;
+    function _GetTransactionActive: TIBTransaction;
   protected
-    procedure SetCommandText(ACommandText: String); override;
-    function GetCommandText: String; override;
+    procedure _SetCommandText(const ACommandText: String); override;
+    function _GetCommandText: String; override;
   public
-    constructor Create(AConnection: TIBDatabase);
+    constructor Create(const AConnection: TIBDatabase;
+      const ADriverTransaction: TDriverTransaction;
+      const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
+    function RowsAffected: UInt32; override;
   end;
 
-  TDriverResultSetIBExpress = class(TDriverResultSet<TIBQuery>)
+  TDriverDataSetIBExpress = class(TDriverDataSet<TIBQuery>)
+  protected
+    procedure _SetUniDirectional(const Value: Boolean); override;
+    procedure _SetReadOnly(const Value: Boolean); override;
+    procedure _SetCachedUpdates(const Value: Boolean); override;
+    procedure _SetCommandText(const ACommandText: String); override;
+    function _GetCommandText: String; override;
   public
-    constructor Create(ADataSet: TIBQuery); override;
+    constructor Create(const ADataSet: TIBQuery; const AMonitorCallback: TMonitorProc); reintroduce;
     destructor Destroy; override;
-    function NotEof: Boolean; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; overload; override;
-    function GetField(const AFieldName: String): TField; override;
+    procedure Open; override;
+    procedure ApplyUpdates; override;
+    procedure CancelUpdates; override;
+    function RowsAffected: UInt32; override;
+    function IsUniDirectional: Boolean; override;
+    function IsReadOnly: Boolean; override;
+    function IsCachedUpdates: Boolean; override;
   end;
 
 implementation
@@ -94,15 +93,18 @@ implementation
 { TDriverIBExpress }
 
 constructor TDriverIBExpress.Create(const AConnection: TComponent;
-  const ADriverName: TDriverName);
+  const ADriverTransaction: TDriverTransaction;
+  const ADriverName: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc);
 begin
-  inherited;
   FConnection := AConnection as TIBDatabase;
-  FDriverName := ADriverName;
+  FDriverTransaction := ADriverTransaction;
+  FDriver := ADriverName;
+  FMonitorCallback := AMonitorCallback;
   FSQLScript := TIBScript.Create(nil);
   try
     FSQLScript.Database := FConnection;
-    FSQLScript.Transaction := FConnection.DefaultTransaction;
+    // Transaction will be assigned on execution based on active transaction
   except
     on E: Exception do
     begin
@@ -121,14 +123,40 @@ end;
 
 procedure TDriverIBExpress.Disconnect;
 begin
-  inherited;
   FConnection.Connected := False;
 end;
 
 procedure TDriverIBExpress.ExecuteDirect(const ASQL: String);
+var
+  LExeSQL: TIBQuery;
 begin
-  inherited;
-  ExecuteDirect(ASQL, nil);
+  if not Assigned(FConnection) then
+    raise Exception.Create('Connection not assigned.');
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+  if ASQL = '' then
+    raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+  LExeSQL := TIBQuery.Create(nil);
+  try
+    LExeSQL.Database := FConnection;
+    LExeSQL.Transaction := _GetTransactionActive;
+    LExeSQL.SQL.Text := ASQL;
+    
+    try
+      LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+    end;
+  finally
+    _SetMonitorLog(LExeSQL.SQL.Text, 'DEFAULT', LExeSQL.Params);
+    LExeSQL.Free;
+  end;
 end;
 
 procedure TDriverIBExpress.ExecuteDirect(const ASQL: String; const AParams: TParams);
@@ -136,11 +164,17 @@ var
   LExeSQL: TIBQuery;
   LFor: UInt16;
 begin
-  inherited;
+  if not Assigned(FConnection) then
+    raise Exception.Create('Connection not assigned.');
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+  if ASQL = '' then
+    raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
   LExeSQL := TIBQuery.Create(nil);
   try
     LExeSQL.Database := FConnection;
-    LExeSQL.Transaction := FConnection.DefaultTransaction;
+    LExeSQL.Transaction := _GetTransactionActive;
     LExeSQL.SQL.Text := ASQL;
     if AParams <> nil then
     begin
@@ -150,78 +184,117 @@ begin
         LExeSQL.ParamByName(AParams[LFor].Name).Value    := AParams[LFor].Value;
       end;
     end;
-    LExeSQL.ExecSQL;
+    
+    try
+      LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(ASQL, E.Message, LExeSQL.Params);
+        raise;
+      end;
+    end;
   finally
+    _SetMonitorLog(LExeSQL.SQL.Text, 'DEFAULT', LExeSQL.Params);
     LExeSQL.Free;
   end;
 end;
 
 procedure TDriverIBExpress.ExecuteScript(const AScript: String);
 begin
-  inherited;
   FSQLScript.Script.Text := AScript;
-  FSQLScript.ExecuteScript;
+  ExecuteScripts;
 end;
 
 procedure TDriverIBExpress.ExecuteScripts;
 begin
-  inherited;
+  if FSQLScript.Script.Count = 0 then
+    raise Exception.Create('No SQL scripts found to execute.');
+
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
   try
-    FSQLScript.ExecuteScript;
+    FSQLScript.Transaction := _GetTransactionActive;
+    try
+      FSQLScript.ExecuteScript;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog('Error during script execution', E.Message, nil);
+        raise;
+      end;
+    end;
   finally
+    _SetMonitorLog(FSQLScript.Script.Text, 'DEFAULT', nil);
     FSQLScript.Script.Clear;
   end;
 end;
 
 procedure TDriverIBExpress.AddScript(const AScript: String);
 begin
-  inherited;
   FSQLScript.Script.Add(AScript);
+end;
+
+function TDriverIBExpress.GetSQLScripts: String;
+begin
+  Result := 'Transaction: ' + 'DEFAULT' + ' ' +  FSQLScript.Script.Text;
 end;
 
 procedure TDriverIBExpress.Connect;
 begin
-  inherited;
   FConnection.Connected := True;
-end;
-
-function TDriverIBExpress.InTransaction: Boolean;
-begin
-  inherited;
-  Result := FConnection.DefaultTransaction.InTransaction;
 end;
 
 function TDriverIBExpress.IsConnected: Boolean;
 begin
-  inherited;
   Result := FConnection.Connected;
+end;
+
+function TDriverIBExpress._GetTransactionActive: TIBTransaction;
+begin
+  if Assigned(FDriverTransaction.TransactionActive) then
+    Result := FDriverTransaction.TransactionActive as TIBTransaction
+  else
+    Result := FConnection.DefaultTransaction;
 end;
 
 function TDriverIBExpress.CreateQuery: IDBQuery;
 begin
-  Result := TDriverQueryIBExpress.Create(FConnection);
+  Result := TDriverQueryIBExpress.Create(FConnection,
+                                         FDriverTransaction,
+                                         FMonitorCallback);
 end;
 
-function TDriverIBExpress.CreateDataSet(const ASQL: String): IDBResultSet;
+function TDriverIBExpress.CreateDataSet(const ASQL: String): IDBDataSet;
 var
   LDBQuery: IDBQuery;
 begin
-  LDBQuery := TDriverQueryIBExpress.Create(FConnection);
+  LDBQuery := TDriverQueryIBExpress.Create(FConnection,
+                                           FDriverTransaction,
+                                           FMonitorCallback);
   LDBQuery.CommandText := ASQL;
-  Result   := LDBQuery.ExecuteQuery;
+  Result := LDBQuery.ExecuteQuery;
 end;
 
-{ TDriverDBExpressQuery }
+{ TDriverQueryIBExpress }
 
-constructor TDriverQueryIBExpress.Create(AConnection: TIBDatabase);
+constructor TDriverQueryIBExpress.Create(const AConnection: TIBDatabase;
+  const ADriverTransaction: TDriverTransaction;
+  const AMonitorCallback: TMonitorProc);
 begin
   if AConnection = nil then
-    Exit;
+    raise Exception.Create('AConnection cannot be nil');
+  if ADriverTransaction = nil then
+    raise Exception.Create('ADriverTransaction cannot be nil');
 
+  FDriverTransaction := ADriverTransaction;
+  FMonitorCallback := AMonitorCallback;
   FSQLQuery := TIBQuery.Create(nil);
   try
     FSQLQuery.Database := AConnection;
-    FSQLQuery.Transaction := AConnection.DefaultTransaction;
+    // Transaction will be assigned on execution
     FSQLQuery.UniDirectional := True;
   except
     on E: Exception do
@@ -238,103 +311,178 @@ begin
   inherited;
 end;
 
-function TDriverQueryIBExpress.ExecuteQuery: IDBResultSet;
+function TDriverQueryIBExpress._GetTransactionActive: TIBTransaction;
+begin
+  if Assigned(FDriverTransaction.TransactionActive) then
+    Result := FDriverTransaction.TransactionActive as TIBTransaction
+  else
+    Result := FSQLQuery.Database.DefaultTransaction;
+end;
+
+function TDriverQueryIBExpress.ExecuteQuery: IDBDataSet;
 var
   LResultSet: TIBQuery;
   LFor: UInt16;
 begin
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
   LResultSet := TIBQuery.Create(nil);
   try
     LResultSet.Database := FSQLQuery.Database;
-    LResultSet.Transaction := FSQLQuery.Transaction;
+    LResultSet.Transaction := _GetTransactionActive;
     LResultSet.UniDirectional := True;
     LResultSet.SQL.Text := FSQLQuery.SQL.Text;
+    
+    if LResultSet.SQL.Text = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
 
     for LFor := 0 to FSQLQuery.Params.Count - 1 do
     begin
       LResultSet.Params[LFor].DataType := FSQLQuery.Params[LFor].DataType;
       LResultSet.Params[LFor].Value    := FSQLQuery.Params[LFor].Value;
     end;
-    LResultSet.Open;
-  except
-    on E: Exception do
-    begin
-      LResultSet.Free;
-      raise Exception.Create(E.Message);
+    
+    try
+      LResultSet.Open;
+      Result := TDriverDataSetIBExpress.Create(LResultSet, FMonitorCallback);
+      if LResultSet.RecordCount = 0 then
+         Result.FetchingAll := True;
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(LResultSet.SQL.Text, E.Message, LResultSet.Params);
+        raise;
+      end;
     end;
+  finally
+    if LResultSet.SQL.Text <> EmptyStr then
+      _SetMonitorLog(LResultSet.SQL.Text, 'DEFAULT', LResultSet.Params);
   end;
-  Result := TDriverResultSetIBExpress.Create(LResultSet);
-  if LResultSet.RecordCount = 0 then
-     Result.FetchingAll := True;
+  except
+    if Assigned(LResultSet) and (Result = nil) then
+      LResultSet.Free;
+    raise;
+  end;
 end;
 
-function TDriverQueryIBExpress.GetCommandText: String;
+function TDriverQueryIBExpress._GetCommandText: String;
 begin
   Result := FSQLQuery.SQL.Text;
 end;
 
-procedure TDriverQueryIBExpress.SetCommandText(ACommandText: String);
+procedure TDriverQueryIBExpress._SetCommandText(const ACommandText: String);
 begin
-  inherited;
   FSQLQuery.SQL.Text := ACommandText;
 end;
 
 procedure TDriverQueryIBExpress.ExecuteDirect;
 begin
-  FSQLQuery.ExecSQL;
+  if _GetTransactionActive = nil then
+    raise Exception.Create('Transaction not assigned.');
+
+  if FSQLQuery.SQL.Text = '' then
+    raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+  FSQLQuery.Transaction := _GetTransactionActive;
+  try
+    FSQLQuery.ExecSQL;
+    FRowsAffected := FSQLQuery.RowsAffected;
+    _SetMonitorLog(FSQLQuery.SQL.Text, 'DEFAULT', FSQLQuery.Params);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog(FSQLQuery.SQL.Text, E.Message, FSQLQuery.Params);
+      raise;
+    end;
+  end;
 end;
 
-{ TDriverResultSetIBExpress }
-
-constructor TDriverResultSetIBExpress.Create(ADataSet: TIBQuery);
+function TDriverQueryIBExpress.RowsAffected: UInt32;
 begin
-  FDataSet := ADataSet;
+  Result := FRowsAffected;
+end;
+
+{ TDriverDataSetIBExpress }
+
+constructor TDriverDataSetIBExpress.Create(const ADataSet: TIBQuery;
+  const AMonitorCallback: TMonitorProc);
+begin
+  inherited Create(ADataSet, AMonitorCallback);
+end;
+
+destructor TDriverDataSetIBExpress.Destroy;
+begin
   inherited;
 end;
 
-destructor TDriverResultSetIBExpress.Destroy;
+procedure TDriverDataSetIBExpress.Open;
 begin
-  FDataSet.Free;
-  inherited;
+  try
+    inherited Open;
+  finally
+    _SetMonitorLog(FDataSet.SQL.Text, 'DEFAULT', FDataSet.Params);
+  end;
 end;
 
-function TDriverResultSetIBExpress.GetFieldValue(const AFieldName: String): Variant;
-var
-  LField: TField;
+function TDriverDataSetIBExpress.RowsAffected: UInt32;
 begin
-  LField := FDataSet.FieldByName(AFieldName);
-  Result := GetFieldValue(LField.Index);
+  Result := FDataSet.RowsAffected;
 end;
 
-function TDriverResultSetIBExpress.GetField(const AFieldName: String): TField;
+function TDriverDataSetIBExpress._GetCommandText: String;
 begin
-  inherited;
-  Result := FDataSet.FieldByName(AFieldName);
+  Result := FDataSet.SQL.Text;
 end;
 
-function TDriverResultSetIBExpress.GetFieldType(const AFieldName: String): TFieldType;
+procedure TDriverDataSetIBExpress._SetCachedUpdates(const Value: Boolean);
 begin
-  Result := FDataSet.FieldByName(AFieldName).DataType;
+  FDataSet.CachedUpdates := Value;
 end;
 
-function TDriverResultSetIBExpress.GetFieldValue(const AFieldIndex: Integer): Variant;
+procedure TDriverDataSetIBExpress._SetCommandText(const ACommandText: String);
 begin
-  if AFieldIndex > FDataSet.FieldCount -1  then
-    Exit(Variants.Null);
-
-  if FDataSet.Fields[AFieldIndex].IsNull then
-    Result := Variants.Null
-  else
-    Result := FDataSet.Fields[AFieldIndex].Value;
+  FDataSet.SQL.Text := ACommandText;
 end;
 
-function TDriverResultSetIBExpress.NotEof: Boolean;
+procedure TDriverDataSetIBExpress._SetReadOnly(const Value: Boolean);
 begin
-  if not FFirstNext then
-     FFirstNext := True
-  else
-     FDataSet.Next;
-  Result := not FDataSet.Eof;
+  // IBQuery does not have ReadOnly property exposed directly in all versions, 
+  // but we can assume standard dataset behavior or ignore if not supported
+end;
+
+procedure TDriverDataSetIBExpress._SetUniDirectional(const Value: Boolean);
+begin
+  FDataSet.UniDirectional := Value;
+end;
+
+procedure TDriverDataSetIBExpress.ApplyUpdates;
+begin
+  // IBQuery is usually read-only or direct SQL. For updates, use CachedUpdates + ApplyUpdates 
+  // if using IBDataSet/IBTable, but here we have TIBQuery.
+  // Assuming standard TDataSet.ApplyUpdates if available or no-op/exception for TIBQuery
+  if FDataSet.CachedUpdates then
+    FDataSet.ApplyUpdates;
+end;
+
+procedure TDriverDataSetIBExpress.CancelUpdates;
+begin
+  FDataSet.CancelUpdates;
+end;
+
+function TDriverDataSetIBExpress.IsCachedUpdates: Boolean;
+begin
+  Result := FDataSet.CachedUpdates;
+end;
+
+function TDriverDataSetIBExpress.IsReadOnly: Boolean;
+begin
+  Result := False; // Default assumption
+end;
+
+function TDriverDataSetIBExpress.IsUniDirectional: Boolean;
+begin
+  Result := FDataSet.UniDirectional;
 end;
 
 end.

@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit FactoryWireMongoDB;
@@ -27,24 +16,24 @@ unit FactoryWireMongoDB;
 interface
 
 uses
-  DB,
-  Classes,
-  SysUtils,
-  // DBE
-  DBE.FactoryConnection,
-  DBE.FactoryInterfaces;
+  System.Classes,
+  System.SysUtils,
+  Data.DB,
+  MongoWireConnection,
+  FactoryConnection,
+  FactoryInterfaces,
+  DriverConnection;
 
 type
-  // Fábrica de conexão concreta com dbExpress
-  TFactoryMongoWire = class(TFactoryConnection)
+  TFactoryWireMongoDB = class(TFactoryConnection)
   public
-    constructor Create(const AConnection: TComponent;
-      const ADriverName: TDriverName); overload;
-    constructor Create(const AConnection: TComponent;
-      const ADriverName: TDriverName;
+    constructor Create(const AConnection: TMongoWireConnection;
+      const ADriverName: TDBEngineDriver); overload;
+    constructor Create(const AConnection: TMongoWireConnection;
+      const ADriverName: TDBEngineDriver;
       const AMonitor: ICommandMonitor); overload;
-    constructor Create(const AConnection: TComponent;
-      const ADriverName: TDriverName;
+    constructor Create(const AConnection: TMongoWireConnection;
+      const ADriverName: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -53,50 +42,55 @@ type
 implementation
 
 uses
-  dbe.driver.wire.mongodb,
-  dbe.driver.wire.mongodb.transaction;
+  DriverWireMongoDB,
+  DriverWireMongoDBTransaction;
 
-{ TFactoryMongoWire }
+{ TFactoryWireMongoDB }
 
-constructor TFactoryMongoWire.Create(AConnection: TComponent; ADriverName: TDriverName);
+constructor TFactoryWireMongoDB.Create(const AConnection: TMongoWireConnection;
+  const ADriverName: TDBEngineDriver);
 begin
-  FDriverTransaction := TDriverMongoWireTransaction.Create(AConnection);
-  FDriverConnection  := TDriverMongoWire.Create(AConnection,
-                                                FDriverTransaction,
-                                                ADriverName,
-                                                FCommandMonitor,
-                                                FMonitorCallback);
+  FDriverTransaction := TDriverWireMongoDBTransaction.Create(AConnection);
+  FDriverConnection  := TDriverWireMongoDB.Create(AConnection,
+                                                  FDriverTransaction,
+                                                  ADriverName,
+                                                  nil);
   FAutoTransaction := False;
 end;
 
-constructor TFactoryMongoWire.Create(const AConnection: TZConnection;
-  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
+constructor TFactoryWireMongoDB.Create(const AConnection: TMongoWireConnection;
+  const ADriverName: TDBEngineDriver; const AMonitor: ICommandMonitor);
 begin
-  Create(AConnection, ADriverName);
   FCommandMonitor := AMonitor;
+  Create(AConnection, ADriverName);
 end;
 
-procedure TFactoryMongoWire.AddTransaction(const AKey: String;
+constructor TFactoryWireMongoDB.Create(const AConnection: TMongoWireConnection;
+  const ADriverName: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+begin
+  FDriverTransaction := TDriverWireMongoDBTransaction.Create(AConnection);
+  FDriverConnection  := TDriverWireMongoDB.Create(AConnection,
+                                                  FDriverTransaction,
+                                                  ADriverName,
+                                                  AMonitorCallback);
+  FMonitorCallback := AMonitorCallback;
+  FAutoTransaction := False;
+end;
+
+destructor TFactoryWireMongoDB.Destroy;
+begin
+  FreeAndNil(FDriverConnection);
+  FreeAndNil(FDriverTransaction);
+  inherited;
+end;
+
+procedure TFactoryWireMongoDB.AddTransaction(const AKey: String;
   const ATransaction: TComponent);
 begin
-  if not (ATransaction is TComponent) then
-    raise Exception.Create('Invalid transaction type. Expected TComponent.');
+  if not (ATransaction is TMongoWireConnection) then
+    raise Exception.Create('Invalid transaction type. Expected TMongoWireConnection.');
 
   inherited AddTransaction(AKey, ATransaction);
-end;
-
-constructor TFactoryMongoWire.Create(const AConnection: TComponent;
-  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
-begin
-  Create(AConnection, ADriverName);
-  FMonitorCallback := AMonitorCallback;
-end;
-
-destructor TFactoryMongoWire.Destroy;
-begin
-  FDriverConnection.Free;
-  FDriverTransaction.Free;
-  inherited;
 end;
 
 end.

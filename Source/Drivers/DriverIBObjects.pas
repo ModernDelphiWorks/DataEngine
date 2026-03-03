@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverIBObjects;
@@ -27,40 +16,36 @@ unit DriverIBObjects;
 interface
 
 uses
-  Classes,
-  DB,
-  Variants,
-  SysUtils,
-
+  System.Classes,
+  System.SysUtils,
+  System.Variants,
+  Data.DB,
   IB_Components,
   IBODataset,
   IB_Access,
-
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces,
-  dbe.utils;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com dbExpress
   TDriverIBObjects = class(TDriverConnection)
   protected
     FConnection: TIBODatabase;
     FSQLScript: TIBOQuery;
   public
     constructor Create(const AConnection: TComponent;
-      const ADriverName: TDriverName); override;
+      const ADriverTransaction: TDriverTransaction;
+      const ADriverName: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
-    procedure ExecuteDirect(const ASQL: String); overload; override;
+    procedure ExecuteDirect(const ASQL: String); override;
     procedure ExecuteDirect(const ASQL: String;
-      const AParams: TParams); overload; override;
+      const AParams: TParams); override;
     procedure ExecuteScript(const AScript: String); override;
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
     function IsConnected: Boolean; override;
-    function InTransaction: Boolean; override;
     function CreateQuery: IDBQuery; override;
     function CreateDataSet(const ASQL: String): IDBResultSet; override;
   end;
@@ -69,24 +54,21 @@ type
   private
     FSQLQuery: TIBOQuery;
   protected
-    procedure SetCommandText(ACommandText: String); override;
-    function GetCommandText: String; override;
+    procedure _SetCommandText(const ACommandText: String); override;
+    function _GetCommandText: String; override;
   public
-    constructor Create(AConnection: TIBODatabase);
+    constructor Create(const AConnection: TIBODatabase;
+      const ADriverTransaction: TDriverTransaction;
+      const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
+    function RowsAffected: UInt32; override;
   end;
 
-  TDriverResultSetIBObjects = class(TDriverResultSet<TIBOQuery>)
+  TDriverDataSetIBObjects = class(TDriverDataSet<TIBOQuery>)
   public
-    constructor Create(ADataSet: TIBOQuery); override;
-    destructor Destroy; override;
-    function NotEof: Boolean; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; overload; override;
-    function GetField(const AFieldName: String): TField; override;
+    constructor Create(const ADataSet: TIBOQuery; const AMonitorCallback: TMonitorProc); reintroduce;
   end;
 
 implementation
@@ -94,140 +76,207 @@ implementation
 { TDriverIBObjects }
 
 constructor TDriverIBObjects.Create(const AConnection: TComponent;
-  const ADriverName: TDriverName);
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc);
 begin
   inherited;
   FConnection := AConnection as TIBODatabase;
-  FDriverName := ADriverName;
+  FDriverTransaction := ADriverTransaction;
+  FDriver := ADriverName;
+  FMonitorCallback := AMonitorCallback;
+  
   FSQLScript := TIBOQuery.Create(nil);
   try
     FSQLScript.IB_Connection := FConnection;
     FSQLScript.IB_Transaction := FConnection.DefaultTransaction;
   except
-    on E: Exception do
-    begin
-      FSQLScript.Free;
-      raise Exception.Create(E.Message);
-    end;
+    FSQLScript.Free;
+    raise;
   end;
 end;
 
 destructor TDriverIBObjects.Destroy;
 begin
-  FConnection := nil;
   FSQLScript.Free;
   inherited;
 end;
 
+procedure TDriverIBObjects.Connect;
+begin
+  if not FConnection.Connected then
+    FConnection.Connected := True;
+end;
+
 procedure TDriverIBObjects.Disconnect;
 begin
-  inherited;
-  FConnection.Connected := False;
+  if FConnection.Connected then
+    FConnection.Connected := False;
+end;
+
+function TDriverIBObjects.IsConnected: Boolean;
+begin
+  Result := FConnection.Connected;
 end;
 
 procedure TDriverIBObjects.ExecuteDirect(const ASQL: String);
-begin
-  inherited;
-  ExecuteDirect(ASQL, nil);
-end;
-
-procedure TDriverIBObjects.ExecuteDirect(const ASQL: String; const AParams: TParams);
 var
   LExeSQL: TIBOQuery;
-  LFor: UInt16;
 begin
   LExeSQL := TIBOQuery.Create(nil);
   try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
     LExeSQL.IB_Connection := FConnection;
     LExeSQL.IB_Transaction := FConnection.DefaultTransaction;
+    
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
     LExeSQL.SQL.Text := ASQL;
-    if AParams <> nil then
+    try
+      LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error during direct execution', E.Message, nil);
+        raise;
+      end;
+    end;
+  finally
+    if Assigned(LExeSQL) then
+    begin
+      _SetMonitorLog(LExeSQL.SQL.Text, '', nil);
+      LExeSQL.Free;
+    end;
+  end;
+end;
+
+procedure TDriverIBObjects.ExecuteDirect(const ASQL: String;
+  const AParams: TParams);
+var
+  LExeSQL: TIBOQuery;
+  LFor: Integer;
+begin
+  LExeSQL := TIBOQuery.Create(nil);
+  try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    LExeSQL.IB_Connection := FConnection;
+    LExeSQL.IB_Transaction := FConnection.DefaultTransaction;
+    
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+    LExeSQL.SQL.Text := ASQL;
+    if AParams.Count > 0 then
     begin
       for LFor := 0 to AParams.Count - 1 do
       begin
+        if not Assigned(AParams[LFor]) then
+          raise Exception.Create(Format('Parameter "%s" is invalid or unassigned.', [AParams[LFor].Name]));
+          
         LExeSQL.ParamByName(AParams[LFor].Name).DataType := AParams[LFor].DataType;
         LExeSQL.ParamByName(AParams[LFor].Name).Value    := AParams[LFor].Value;
       end;
     end;
-    LExeSQL.ExecSQL;
+    
+    try
+      LExeSQL.Prepare;
+      LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(ASQL, E.Message, nil);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error during direct execution', E.Message, nil);
+        raise;
+      end;
+    end;
   finally
-    LExeSQL.Free;
+    if Assigned(LExeSQL) then
+    begin
+      _SetMonitorLog(LExeSQL.SQL.Text, '', AParams);
+      LExeSQL.Free;
+    end;
   end;
 end;
 
 procedure TDriverIBObjects.ExecuteScript(const AScript: String);
 begin
-  inherited;
-  FSQLScript.SQL.Text := AScript;
-  FSQLScript.ExecSQL;
-end;
-
-procedure TDriverIBObjects.ExecuteScripts;
-begin
-  inherited;
-  try
-    FSQLScript.ExecSQL;
-  finally
-    FSQLScript.SQL.Clear;
-  end;
+  AddScript(AScript);
+  ExecuteScripts;
 end;
 
 procedure TDriverIBObjects.AddScript(const AScript: String);
 begin
-  inherited;
   FSQLScript.SQL.Add(AScript);
 end;
 
-procedure TDriverIBObjects.Connect;
+procedure TDriverIBObjects.ExecuteScripts;
 begin
-  inherited;
-  FConnection.Connected := True;
-end;
-
-function TDriverIBObjects.InTransaction: Boolean;
-begin
-  inherited;
-  Result := FConnection.DefaultTransaction.InTransaction;
-end;
-
-function TDriverIBObjects.IsConnected: Boolean;
-begin
-  inherited;
-  Result := FConnection.Connected;
+  try
+    FSQLScript.ExecSQL;
+    FRowsAffected := FSQLScript.RowsAffected;
+    _SetMonitorLog(FSQLScript.SQL.Text, '', nil);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog('Error executing script', E.Message, nil);
+      raise;
+    end;
+  end;
+  FSQLScript.SQL.Clear;
 end;
 
 function TDriverIBObjects.CreateQuery: IDBQuery;
 begin
-  Result := TDriverQueryIBObjects.Create(FConnection);
+  Result := TDriverQueryIBObjects.Create(FConnection, FDriverTransaction, FMonitorCallback);
 end;
 
 function TDriverIBObjects.CreateDataSet(const ASQL: String): IDBResultSet;
 var
   LDBQuery: IDBQuery;
 begin
-  LDBQuery := TDriverQueryIBObjects.Create(FConnection);
+  LDBQuery := TDriverQueryIBObjects.Create(FConnection, FDriverTransaction, FMonitorCallback);
   LDBQuery.CommandText := ASQL;
-  Result   := LDBQuery.ExecuteQuery;
+  Result := LDBQuery.ExecuteQuery;
 end;
 
-{ TDriverDBExpressQuery }
+{ TDriverQueryIBObjects }
 
-constructor TDriverQueryIBObjects.Create(AConnection: TIBODatabase);
+constructor TDriverQueryIBObjects.Create(const AConnection: TIBODatabase;
+  const ADriverTransaction: TDriverTransaction;
+  const AMonitorCallback: TMonitorProc);
 begin
   if AConnection = nil then
-    Exit;
+    raise Exception.Create('AConnection cannot be nil');
 
+  FDriverTransaction := ADriverTransaction;
+  FMonitorCallback := AMonitorCallback;
   FSQLQuery := TIBOQuery.Create(nil);
   try
     FSQLQuery.IB_Connection := AConnection;
     FSQLQuery.IB_Transaction := AConnection.DefaultTransaction;
     FSQLQuery.UniDirectional := True;
   except
-    on E: Exception do
-    begin
-      FSQLQuery.Free;
-      raise Exception.Create(E.Message);
-    end;
+    FSQLQuery.Free;
+    raise;
   end;
 end;
 
@@ -237,103 +286,129 @@ begin
   inherited;
 end;
 
-function TDriverQueryIBObjects.ExecuteQuery: IDBResultSet;
-var
-  LResultSet: TIBOQuery;
-  LFor: UInt16;
-begin
-  LResultSet := TIBOQuery.Create(nil);
-  try
-    LResultSet.IB_Connection := FSQLQuery.IB_Connection;
-    LResultSet.IB_Transaction := FSQLQuery.IB_Transaction;
-    LResultSet.SQL.Text := FSQLQuery.SQL.Text;
-
-    for LFor := 0 to FSQLQuery.Params.Count - 1 do
-    begin
-      LResultSet.Params[LFor].DataType := FSQLQuery.Params[LFor].DataType;
-      LResultSet.Params[LFor].Value    := FSQLQuery.Params[LFor].Value;
-    end;
-    LResultSet.Open;
-  except
-    on E: Exception do
-    begin
-      LResultSet.Free;
-      raise Exception.Create(E.Message);
-    end;
-  end;
-  Result := TDriverResultSetIBObjects.Create(LResultSet);
-  if LResultSet.RecordCount = 0 then
-     Result.FetchingAll := True;
-end;
-
-function TDriverQueryIBObjects.GetCommandText: String;
+function TDriverQueryIBObjects._GetCommandText: String;
 begin
   Result := FSQLQuery.SQL.Text;
 end;
 
-procedure TDriverQueryIBObjects.SetCommandText(ACommandText: String);
+procedure TDriverQueryIBObjects._SetCommandText(const ACommandText: String);
 begin
-  inherited;
   FSQLQuery.SQL.Text := ACommandText;
 end;
 
 procedure TDriverQueryIBObjects.ExecuteDirect;
-begin
-  FSQLQuery.ExecSQL;
-end;
-
-{ TDriverResultSetIBObjects }
-
-constructor TDriverResultSetIBObjects.Create(ADataSet: TIBOQuery);
-begin
-  FDataSet := ADataSet;
-  inherited;
-end;
-
-destructor TDriverResultSetIBObjects.Destroy;
-begin
-  FDataSet.Free;
-  inherited;
-end;
-
-function TDriverResultSetIBObjects.GetFieldValue(const AFieldName: String): Variant;
 var
-  LField: TField;
+  LExeSQL: TIBOQuery;
+  LFor: Integer;
 begin
-  LField := FDataSet.FieldByName(AFieldName);
-  Result := GetFieldValue(LField.Index);
+  LExeSQL := TIBOQuery.Create(nil);
+  try
+    if FSQLQuery.IB_Connection = nil then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    LExeSQL.IB_Connection := FSQLQuery.IB_Connection;
+    LExeSQL.IB_Transaction := FSQLQuery.IB_Transaction;
+    LExeSQL.SQL.Text := FSQLQuery.SQL.Text;
+    
+    if FSQLQuery.Params.Count > 0 then
+    begin
+      for LFor := 0 to FSQLQuery.Params.Count - 1 do
+      begin
+        LExeSQL.ParamByName(FSQLQuery.Params[LFor].Name).DataType := FSQLQuery.Params[LFor].DataType;
+        LExeSQL.ParamByName(FSQLQuery.Params[LFor].Name).Value    := FSQLQuery.Params[LFor].Value;
+      end;
+    end;
+    
+    try
+      LExeSQL.Prepare;
+      LExeSQL.ExecSQL;
+      FRowsAffected := LExeSQL.RowsAffected;
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(LExeSQL.SQL.Text, E.Message, nil);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error', E.Message, nil);
+        raise;
+      end;
+    end;
+  finally
+    if Assigned(LExeSQL) then
+    begin
+      _SetMonitorLog(LExeSQL.SQL.Text, '', nil);
+      LExeSQL.Free;
+    end;
+  end;
 end;
 
-function TDriverResultSetIBObjects.GetField(const AFieldName: String): TField;
+function TDriverQueryIBObjects.ExecuteQuery: IDBDataSet;
+var
+  LDataSet: TIBOQuery;
+  LFor: Integer;
 begin
-  inherited;
-  Result := FDataSet.FieldByName(AFieldName);
+  LDataSet := TIBOQuery.Create(nil);
+  try
+    if FSQLQuery.IB_Connection = nil then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+      
+    LDataSet.IB_Connection := FSQLQuery.IB_Connection;
+    LDataSet.IB_Transaction := FSQLQuery.IB_Transaction;
+    LDataSet.SQL.Text := FSQLQuery.SQL.Text;
+    
+    try
+      if FSQLQuery.Params.Count > 0 then
+      begin
+        for LFor := 0 to FSQLQuery.Params.Count - 1 do
+        begin
+           LDataSet.ParamByName(FSQLQuery.Params[LFor].Name).DataType := FSQLQuery.Params[LFor].DataType;
+           LDataSet.ParamByName(FSQLQuery.Params[LFor].Name).Value    := FSQLQuery.Params[LFor].Value;
+        end;
+      end;
+      
+      if LDataSet.SQL.Text = '' then
+        raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+        
+      LDataSet.Prepare;
+      LDataSet.Open;
+      Result := TDriverDataSetIBObjects.Create(LDataSet, FMonitorCallback);
+    except
+      on E: EDatabaseError do
+      begin
+        _SetMonitorLog(LDataSet.SQL.Text, E.Message, nil);
+        FreeAndNil(LDataSet);
+        raise;
+      end;
+      on E: Exception do
+      begin
+        _SetMonitorLog('General error', E.Message, nil);
+        FreeAndNil(LDataSet);
+        raise;
+      end;
+    end;
+  finally
+    if Assigned(LDataSet) and (not Assigned(Result)) then 
+       LDataSet.Free; 
+  end;
 end;
 
-function TDriverResultSetIBObjects.GetFieldType(const AFieldName: String): TFieldType;
+function TDriverQueryIBObjects.RowsAffected: UInt32;
 begin
-  Result := FDataSet.FieldByName(AFieldName).DataType;
+  Result := FRowsAffected;
 end;
 
-function TDriverResultSetIBObjects.GetFieldValue(const AFieldIndex: Integer): Variant;
+{ TDriverDataSetIBObjects }
+
+constructor TDriverDataSetIBObjects.Create(const ADataSet: TIBOQuery;
+  const AMonitorCallback: TMonitorProc);
 begin
-  if AFieldIndex > FDataSet.FieldCount -1  then
-    Exit(Variants.Null);
-
-  if FDataSet.Fields[AFieldIndex].IsNull then
-    Result := Variants.Null
-  else
-    Result := FDataSet.Fields[AFieldIndex].Value;
-end;
-
-function TDriverResultSetIBObjects.NotEof: Boolean;
-begin
-  if not FFirstNext then
-     FFirstNext := True
-  else
-     FDataSet.Next;
-
-  Result := not FDataSet.Eof;
+  inherited Create(ADataSet, AMonitorCallback);
 end;
 
 end.

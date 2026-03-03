@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverSQLite3;
@@ -27,34 +16,35 @@ unit DriverSQLite3;
 interface
 
 uses
-  Classes,
-  DB,
-  Variants,
+  System.Classes,
+  System.SysUtils,
+  System.Variants,
+  Data.DB,
   SQLiteTable3,
   Datasnap.DBClient,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com dbExpress
   TDriverSQLite3 = class(TDriverConnection)
   protected
     FConnection: TSQLiteDatabase;
-    FScripts: TStrings;
+    FScripts: TStringList;
   public
     constructor Create(const AConnection: TComponent;
-      const ADriverName: TDriverName); override;
+      const ADriverTransaction: TDriverTransaction;
+      const ADriverName: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
     procedure ExecuteDirect(const ASQL: String); override;
-    procedure ExecuteDirect(const ASQL: String; const AParams: TParams); override;
+    procedure ExecuteDirect(const ASQL: String;
+      const AParams: TParams); override;
     procedure ExecuteScript(const AScript: String); override;
     procedure AddScript(const AScript: String); override;
     procedure ExecuteScripts; override;
     function IsConnected: Boolean; override;
-    function InTransaction: Boolean; override;
     function CreateQuery: IDBQuery; override;
     function CreateDataSet(const ASQL: String): IDBResultSet; override;
   end;
@@ -62,17 +52,21 @@ type
   TDriverQuerySQLite3 = class(TDriverQuery)
   private
     FSQLQuery: TSQLitePreparedStatement;
+    FConnection: TSQLiteDatabase;
   protected
-    procedure SetCommandText(ACommandText: String); override;
-    function GetCommandText: String; override;
+    procedure _SetCommandText(const ACommandText: String); override;
+    function _GetCommandText: String; override;
   public
-    constructor Create(AConnection: TSQLiteDatabase);
+    constructor Create(const AConnection: TSQLiteDatabase;
+      const ADriverTransaction: TDriverTransaction;
+      const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure ExecuteDirect; override;
-    function ExecuteQuery: IDBResultSet; override;
+    function ExecuteQuery: IDBDataSet; override;
+    function RowsAffected: UInt32; override;
   end;
 
-  TDriverResultSetSQLite3 = class(TDriverResultSetBase)
+  TDriverDataSetSQLite3 = class(TDriverResultSetBase)
   private
     procedure CreateFieldDefs;
   protected
@@ -85,7 +79,7 @@ type
     FDataSetInternal: TClientDataSet;
   public
     constructor Create(const AConnection: TSQLiteDatabase;
-      const ADataSet: ISQLiteTable);
+      const ADataSet: ISQLiteTable; const AMonitorCallback: TMonitorProc);
     destructor Destroy; override;
     procedure Close; override;
     function NotEof: Boolean; override;
@@ -95,131 +89,169 @@ type
     function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
     function GetFieldType(const AFieldName: String): TFieldType; override;
     function GetField(const AFieldName: String): TField; override;
+    function RowsAffected: UInt32; override;
   end;
 
 implementation
 
-uses
-  SysUtils;
-
 { TDriverSQLite3 }
 
 constructor TDriverSQLite3.Create(const AConnection: TComponent;
-  const ADriverName: TDriverName);
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc);
 begin
   inherited;
   FConnection := AConnection as TSQLiteDatabase;
   FConnection.Connected := True;
-  FDriverName := ADriverName;
+  FDriverTransaction := ADriverTransaction;
+  FDriver := ADriverName;
+  FMonitorCallback := AMonitorCallback;
   FScripts := TStringList.Create;
 end;
 
 destructor TDriverSQLite3.Destroy;
 begin
-  FConnection.Connected := False;
-  FConnection := nil;
   FScripts.Free;
+  FConnection.Connected := False;
   inherited;
+end;
+
+procedure TDriverSQLite3.Connect;
+begin
+  FConnection.Connected := True;
 end;
 
 procedure TDriverSQLite3.Disconnect;
 begin
-  inherited;
-  /// <summary>
-  ///   Esse driver nativo, por motivo de erro, tem que manter a conexão aberta
-  ///   até o final do uso da aplicação.
-  ///   O FConnection.Connected := False; é chamado no Destroy;
-  /// </summary>
+  // This native driver, for some reason, needs to keep the connection open
+  // until the end of application usage.
+  // FConnection.Connected := False; is called in Destroy;
+end;
+
+function TDriverSQLite3.IsConnected: Boolean;
+begin
+  Result := FConnection.Connected;
 end;
 
 procedure TDriverSQLite3.ExecuteDirect(const ASQL: String);
 begin
-  inherited;
-  FConnection.ExecSQL(ASQL);
+  try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+    FConnection.ExecSQL(ASQL);
+    // SQLiteTable3 ExecSQL doesn't easily return rows affected for direct exec
+    FRowsAffected := 0; 
+    _SetMonitorLog(ASQL, '', nil);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog(ASQL, E.Message, nil);
+      raise;
+    end;
+  end;
 end;
 
-procedure TDriverSQLite3.ExecuteDirect(const ASQL: String; const AParams: TParams);
+procedure TDriverSQLite3.ExecuteDirect(const ASQL: String;
+  const AParams: TParams);
 var
   LExeSQL: ISQLitePreparedStatement;
-  LAffectedRows: UInt32;
-  LFor: UInt16;
+  LAffectedRows: Integer;
+  LFor: Integer;
 begin
-  LExeSQL := TSQLitePreparedStatement.Create(FConnection);
-  /// <summary>
-  ///   Tem um Bug no método SetParamVariant(Name, Value) passando parêmetro NAME,
-  ///   por isso usei passando o INDEX.
-  ///   </summary>
-  LExeSQL.ClearParams;
-  for LFor := 0 to AParams.Count -1 do
-    LExeSQL.SetParamVariant(AParams.Items[LFor].Name, AParams.Items[LFor].Value);
-  LExeSQL.PrepareStatement(ASQL);
   try
+    if not Assigned(FConnection) then
+      raise Exception.Create('Connection not assigned.');
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    if ASQL = '' then
+      raise Exception.Create('SQL statement is empty. Cannot execute the query.');
+
+    LExeSQL := TSQLitePreparedStatement.Create(FConnection);
+    LExeSQL.ClearParams;
+    
+    // There is a bug in SetParamVariant(Name, Value) passing NAME parameter,
+    // so we use INDEX passing.
+    for LFor := 0 to AParams.Count - 1 do
+      LExeSQL.SetParamVariant(AParams.Items[LFor].Name, AParams.Items[LFor].Value);
+      
+    LExeSQL.PrepareStatement(ASQL);
     LExeSQL.ExecSQL(LAffectedRows);
+    FRowsAffected := LAffectedRows;
+    
+    _SetMonitorLog(ASQL, '', AParams);
   except
-    raise;
+    on E: Exception do
+    begin
+      _SetMonitorLog(ASQL, E.Message, nil);
+      raise;
+    end;
   end;
 end;
 
 procedure TDriverSQLite3.ExecuteScript(const AScript: String);
 begin
-  inherited;
-  FConnection.ExecSQL(AScript);
-end;
-
-procedure TDriverSQLite3.ExecuteScripts;
-var
-  LFor: UInt32;
-begin
-  inherited;
-  try
-    for LFor := 0 to FScripts.Count -1 do
-      FConnection.ExecSQL(FScripts[LFor]);
-  finally
-    FScripts.Clear;
-  end;
+  AddScript(AScript);
+  ExecuteScripts;
 end;
 
 procedure TDriverSQLite3.AddScript(const AScript: String);
 begin
-  inherited;
   FScripts.Add(AScript);
 end;
 
-procedure TDriverSQLite3.Connect;
+procedure TDriverSQLite3.ExecuteScripts;
+var
+  LFor: Integer;
 begin
-  inherited;
-  FConnection.Connected := True;
-end;
-
-function TDriverSQLite3.InTransaction: Boolean;
-begin
-  Result := FConnection.IsTransactionOpen;
-end;
-
-function TDriverSQLite3.IsConnected: Boolean;
-begin
-  inherited;
-  Result := FConnection.Connected;
+  try
+    for LFor := 0 to FScripts.Count - 1 do
+    begin
+       FConnection.ExecSQL(FScripts[LFor]);
+       _SetMonitorLog(FScripts[LFor], '', nil);
+    end;
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog('Error executing script', E.Message, nil);
+      raise;
+    end;
+  end;
+  FScripts.Clear;
 end;
 
 function TDriverSQLite3.CreateQuery: IDBQuery;
 begin
-  Result := TDriverQuerySQLite3.Create(FConnection);
+  Result := TDriverQuerySQLite3.Create(FConnection, FDriverTransaction, FMonitorCallback);
 end;
 
 function TDriverSQLite3.CreateDataSet(const ASQL: String): IDBResultSet;
 var
   LDBQuery: IDBQuery;
 begin
-  LDBQuery := TDriverQuerySQLite3.Create(FConnection);
+  LDBQuery := TDriverQuerySQLite3.Create(FConnection, FDriverTransaction, FMonitorCallback);
   LDBQuery.CommandText := ASQL;
-  Result   := LDBQuery.ExecuteQuery;
+  Result := LDBQuery.ExecuteQuery;
 end;
 
-{ TDriverDBExpressQuery }
+{ TDriverQuerySQLite3 }
 
-constructor TDriverQuerySQLite3.Create(AConnection: TSQLiteDatabase);
+constructor TDriverQuerySQLite3.Create(const AConnection: TSQLiteDatabase;
+  const ADriverTransaction: TDriverTransaction;
+  const AMonitorCallback: TMonitorProc);
 begin
+  if AConnection = nil then
+    raise Exception.Create('AConnection cannot be nil');
+
+  FConnection := AConnection;
+  FDriverTransaction := ADriverTransaction;
+  FMonitorCallback := AMonitorCallback;
   FSQLQuery := TSQLitePreparedStatement.Create(AConnection);
 end;
 
@@ -229,61 +261,85 @@ begin
   inherited;
 end;
 
-function TDriverQuerySQLite3.ExecuteQuery: IDBResultSet;
-var
-  LStatement: TSQLitePreparedStatement;
-  LResultSet: ISQLiteTable;
-begin
-  LStatement := TSQLitePreparedStatement.Create(FSQLQuery.DB, FSQLQuery.SQL);
-  try
-    try
-      LResultSet := LStatement.ExecQueryIntf;
-    except
-      raise;
-    end;
-    Result := TDriverResultSetSQLite3.Create(FSQLQuery.DB, LResultSet);
-    if LResultSet.Eof then
-      Result.FetchingAll := True;
-  finally
-    LStatement.Free;
-  end;
-end;
-
-function TDriverQuerySQLite3.GetCommandText: String;
+function TDriverQuerySQLite3._GetCommandText: String;
 begin
   Result := FSQLQuery.SQL;
 end;
 
-procedure TDriverQuerySQLite3.SetCommandText(ACommandText: String);
+procedure TDriverQuerySQLite3._SetCommandText(const ACommandText: String);
 begin
-  inherited;
   FSQLQuery.SQL := ACommandText;
 end;
 
 procedure TDriverQuerySQLite3.ExecuteDirect;
 begin
-  FSQLQuery.ExecSQL;
+  try
+    if FDriverTransaction.TransactionActive = nil then
+      raise Exception.Create('Transaction not assigned.');
+
+    FSQLQuery.ExecSQL;
+    _SetMonitorLog(FSQLQuery.SQL, '', nil);
+  except
+    on E: Exception do
+    begin
+      _SetMonitorLog(FSQLQuery.SQL, E.Message, nil);
+      raise;
+    end;
+  end;
 end;
 
-
-procedure TDriverResultSetSQLite3.Close;
+function TDriverQuerySQLite3.ExecuteQuery: IDBResultSet;
+var
+  LStatement: TSQLitePreparedStatement;
+  LResultSet: ISQLiteTable;
 begin
-  if Assigned(FDataSet) then
-    FDataSet := nil;
+  LStatement := TSQLitePreparedStatement.Create(FConnection, FSQLQuery.SQL);
+  try
+    try
+      if FDriverTransaction.TransactionActive = nil then
+        raise Exception.Create('Transaction not assigned.');
+        
+      LResultSet := LStatement.ExecQueryIntf;
+      _SetMonitorLog(FSQLQuery.SQL, '', nil);
+    except
+      on E: Exception do
+      begin
+        _SetMonitorLog(FSQLQuery.SQL, E.Message, nil);
+        raise;
+      end;
+    end;
+    
+    Result := TDriverResultSetSQLite3.Create(FConnection, LResultSet, FMonitorCallback);
+    if LResultSet.Eof then
+      // In this driver/wrapper, Eof being true immediately might mean empty set or just positioned at end
+      // Assuming FetchingAll logic is handled by caller or specific to this driver's behavior
+      // Leaving as per original logic but standardized
+      (Result as TDriverResultSetSQLite3).FFetchingAll := True;
+  finally
+    LStatement.Free;
+  end;
 end;
+
+function TDriverQuerySQLite3.RowsAffected: UInt32;
+begin
+  Result := FRowsAffected;
+end;
+
+{ TDriverResultSetSQLite3 }
 
 constructor TDriverResultSetSQLite3.Create(const AConnection: TSQLiteDatabase;
-  const ADataSet: ISQLiteTable);
+  const ADataSet: ISQLiteTable; const AMonitorCallback: TMonitorProc);
 var
   LField: TField;
-  LFor: UInt16;
+  LFor: Integer;
 begin
+  inherited Create(AMonitorCallback);
   FConnection := AConnection;
   FDataSet := ADataSet;
   FFieldDefs := TFieldDefs.Create(nil);
   FDataSetInternal := TClientDataSet.Create(nil);
-  LField := nil;
-  for LFor := 0 to FDataSet.FieldCount -1 do
+  
+  for LFor := 0 to FDataSet.FieldCount - 1 do
   begin
     case FDataSet.Fields[LFor].FieldType of
       0: LField := TStringField.Create(FDataSetInternal);
@@ -291,18 +347,16 @@ begin
       2: LField := TFloatField.Create(FDataSetInternal);
       3: LField := TWideStringField.Create(FDataSetInternal);
       4: LField := TBlobField.Create(FDataSetInternal);
-//      5:
       15: LField := TDateField.Create(FDataSetInternal);
       16: LField := TDateTimeField.Create(FDataSetInternal);
+      else LField := TStringField.Create(FDataSetInternal); // Default fallback
     end;
     LField.FieldName := FDataSet.Fields[LFor].Name;
     LField.DataSet := FDataSetInternal;
     LField.FieldKind := fkData;
   end;
+  
   FDataSetInternal.CreateDataSet;
-  /// <summary>
-  ///   Criar os FieldDefs, pois nesse driver não cria automaticamente.
-  /// </summary>
   CreateFieldDefs;
 end;
 
@@ -314,21 +368,27 @@ begin
   inherited;
 end;
 
+procedure TDriverResultSetSQLite3.Close;
+begin
+  if Assigned(FDataSet) then
+    FDataSet := nil;
+end;
+
 function TDriverResultSetSQLite3.FieldDefs: TFieldDefs;
 begin
-  inherited;
   Result := FFieldDefs;
 end;
 
 function TDriverResultSetSQLite3.GetFieldValue(const AFieldName: String): Variant;
 begin
-  inherited;
   Result := FDataSet.FieldByName[AFieldName].Value;
 end;
 
 function TDriverResultSetSQLite3.GetField(const AFieldName: String): TField;
 begin
-  inherited;
+  if not FDataSetInternal.Active then
+    FDataSetInternal.CreateDataSet;
+    
   FDataSetInternal.Edit;
   FDataSetInternal.FieldByName(AFieldName).Value := FDataSet.FieldByName[AFieldName].Value;
   FDataSetInternal.Post;
@@ -337,14 +397,12 @@ end;
 
 function TDriverResultSetSQLite3.GetFieldType(const AFieldName: String): TFieldType;
 begin
-  inherited;
   Result := TFieldType(FDataSet.FindField(AFieldName).FieldType);
 end;
 
 function TDriverResultSetSQLite3.GetFieldValue(const AFieldIndex: UInt16): Variant;
 begin
-  inherited;
-  if Cardinal(AFieldIndex) > FDataSet.FieldCount -1 then
+  if Cardinal(AFieldIndex) > Cardinal(FDataSet.FieldCount - 1) then
     Exit(Variants.Null);
 
   if FDataSet.Fields[AFieldIndex].IsNull then
@@ -355,7 +413,6 @@ end;
 
 function TDriverResultSetSQLite3.NotEof: Boolean;
 begin
-  inherited;
   if not FFirstNext then
     FFirstNext := True
   else
@@ -365,16 +422,21 @@ end;
 
 function TDriverResultSetSQLite3.RecordCount: UInt32;
 begin
-  inherited;
   Result := FDataSet.Row;
+end;
+
+function TDriverResultSetSQLite3.RowsAffected: UInt32;
+begin
+  // SQLiteTable3 doesn't typically store rows affected for result sets
+  Result := 0;
 end;
 
 procedure TDriverResultSetSQLite3.CreateFieldDefs;
 var
-  LFor: UInt16;
+  LFor: Integer;
 begin
   FFieldDefs.Clear;
-  for LFor := 0 to FDataSet.FieldCount -1 do
+  for LFor := 0 to FDataSet.FieldCount - 1 do
   begin
     with FFieldDefs.AddFieldDef do
     begin

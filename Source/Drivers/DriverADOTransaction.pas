@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverADOTransaction;
@@ -29,13 +18,13 @@ interface
 uses
   Classes,
   DB,
+  SysUtils,
+  Generics.Collections,
   ADODB,
-  /// DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection,
+  FactoryInterfaces;
 
 type
-  // Classe de conexão concreta com dbExpress
   TDriverADOTransaction = class(TDriverTransaction)
   protected
     FConnection: TADOConnection;
@@ -54,35 +43,42 @@ implementation
 
 constructor TDriverADOTransaction.Create(const AConnection: TComponent);
 begin
+  inherited;
   FConnection := AConnection as TADOConnection;
+  
+  // ADO manages transactions on the connection itself. 
+  // We treat the Connection as the "Transaction Object" for consistency in storage.
+  FTransactionList.Add('DEFAULT', FConnection);
+  FTransactionActive := FConnection;
 end;
 
 destructor TDriverADOTransaction.Destroy;
 begin
+  FTransactionActive := nil;
   FConnection := nil;
   inherited;
 end;
 
 function TDriverADOTransaction.InTransaction: Boolean;
 begin
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
+    
   Result := FConnection.InTransaction;
 end;
 
 procedure TDriverADOTransaction.StartTransaction;
 begin
-  inherited;
   FConnection.BeginTrans;
 end;
 
 procedure TDriverADOTransaction.Commit;
 begin
-  inherited;
   FConnection.CommitTrans;
 end;
 
 procedure TDriverADOTransaction.Rollback;
 begin
-  inherited;
   FConnection.RollbackTrans;
 end;
 

@@ -1,27 +1,14 @@
 ﻿{
-                          Apache License
-                      Version 2.0, January 2004
-                   http://www.apache.org/licenses/
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-       Licensed under the Apache License, Version 2.0 (the "License");
-       you may not use this file except in compliance with the License.
-       You may obtain a copy of the License at
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-             http://www.apache.org/licenses/LICENSE-2.0
-
-       Unless required by applicable law or agreed to in writing, software
-       distributed under the License is distributed on an "AS IS" BASIS,
-       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-       See the License for the specific language governing permissions and
-       limitations under the License.
-}
-
-{
-  @abstract(DBEngine4D: Database Engine Framework for Delphi)
-  @description(A flexible and modular database engine framework for Delphi applications)
-  @created(03 Abr 2025)
-  @author(Isaque Pinheiro <isaquepsp@gmail.com>)
-  @Discord(https://discord.gg/T2zJC8zX)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverMemoryTransaction;
@@ -33,14 +20,14 @@ uses
   Classes,
   SysUtils,
   Generics.Collections,
-  DBEngine.DriverConnection,
-  DBEngine.FactoryInterfaces;
+  DriverConnection,
+  DriverMemory,
+  FactoryInterfaces;
 
 type
   TDriverMemoryTransaction = class(TDriverTransaction)
   private
-    FConnection: TComponent;
-    FActive: Boolean;
+    FConnection: TMemoryConnection;
   public
     constructor Create(const AConnection: TComponent); override;
     destructor Destroy; override;
@@ -57,8 +44,11 @@ implementation
 constructor TDriverMemoryTransaction.Create(const AConnection: TComponent);
 begin
   inherited Create(AConnection);
-  FConnection := AConnection;
-  FActive := False;
+  if AConnection is TMemoryConnection then
+    FConnection := TMemoryConnection(AConnection)
+  else
+    raise Exception.Create('Invalid connection type. Expected TMemoryConnection.');
+
   FTransactionList.Add('DEFAULT', FConnection);
   FTransactionActive := FConnection;
 end;
@@ -71,28 +61,22 @@ end;
 
 procedure TDriverMemoryTransaction.StartTransaction;
 begin
-  if FActive then
-    raise Exception.Create('Transaction already active.');
-  FActive := True;
+  FConnection.StartTransaction;
 end;
 
 procedure TDriverMemoryTransaction.Commit;
 begin
-  if FActive then
-    FActive := False;
+  FConnection.Commit;
 end;
 
 procedure TDriverMemoryTransaction.Rollback;
 begin
-  if FActive then
-    FActive := False;
+  FConnection.Rollback;
 end;
 
 function TDriverMemoryTransaction.InTransaction: Boolean;
 begin
-  if not Assigned(FTransactionActive) then
-    raise Exception.Create('The active transaction is not defined.');
-  Result := FActive;
+  Result := FConnection.InTransaction;
 end;
 
 end.

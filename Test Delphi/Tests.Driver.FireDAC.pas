@@ -28,7 +28,7 @@ uses
   FireDAC.DApt.Intf,
   FireDAC.Comp.DataSet,
 
-  DBEngine.FactoryInterfaces;
+  FactoryInterfaces;
 
 type
   [TestFixture]
@@ -76,7 +76,7 @@ type
 implementation
 
 uses
-  DBEngine.FactoryFireDac,
+  FactoryFireDac,
   Tests.Consts;
 
 { TTestDriverConnection }

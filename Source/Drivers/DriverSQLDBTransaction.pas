@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit DriverSQLDBTransaction;
@@ -27,14 +16,12 @@ unit DriverSQLDBTransaction;
 interface
 
 uses
-  DB,
-  Classes,
-  SysUtils,
-  Generics.Collections,
+  System.Classes,
+  System.SysUtils,
+  System.Generics.Collections,
+  Data.DB,
   SQLDB,
-  // DBE
-  DBE.DriverConnection,
-  DBE.FactoryInterfaces;
+  DriverConnection;
 
 type
   TDriverSQLdbTransaction = class(TDriverTransaction)
@@ -52,19 +39,26 @@ type
 
 implementation
 
-{ TDriverFireDACTransaction }
+{ TDriverSQLdbTransaction }
 
 constructor TDriverSQLdbTransaction.Create(const AConnection: TComponent);
 begin
-  FTransactionList := TDictionary<String, TComponent>.Create;
-  FConnection := AConnection as TSQLConnection;
+  inherited Create(AConnection);
+  if not (AConnection is TSQLConnection) then
+    raise Exception.Create('Invalid connection type. Expected TSQLConnection.');
+
+  FConnection := TSQLConnection(AConnection);
+  
   if FConnection.Transaction = nil then
   begin
     FTransaction := TSQLTransaction.Create(nil);
     FTransaction.Database := FConnection;
     FConnection.Transaction := FTransaction;
   end;
-  FConnection.Transaction.Name := 'DEFAULT';
+  
+  if FConnection.Transaction.Name = '' then
+    FConnection.Transaction.Name := 'DEFAULT';
+    
   FTransactionList.Add('DEFAULT', FConnection.Transaction);
   FTransactionActive := FConnection.Transaction;
 end;
@@ -75,34 +69,46 @@ begin
   begin
     FConnection.Transaction := nil;
     FTransaction.Database := nil;
-    FTransaction.Free;
+    FreeAndNil(FTransaction);
   end;
   FTransactionActive := nil;
-  FTransactionList.Clear;
-  FTransactionList.Free;
+  FConnection := nil;
   inherited;
-end;
-
-procedure TDriverSQLdbTransaction.StartTransaction;
-begin
-  (FTransactionActive as TSQLTransaction).StartTransaction;
-end;
-
-procedure TDriverSQLdbTransaction.Commit;
-begin
-  (FTransactionActive as TSQLTransaction).Commit;
-end;
-
-procedure TDriverSQLdbTransaction.Rollback;
-begin
-  (FTransactionActive as TSQLTransaction).Rollback;
 end;
 
 function TDriverSQLdbTransaction.InTransaction: Boolean;
 begin
   if not Assigned(FTransactionActive) then
     raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
+    
   Result := (FTransactionActive as TSQLTransaction).Active;
+end;
+
+procedure TDriverSQLdbTransaction.StartTransaction;
+begin
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined.');
+
+  if not (FTransactionActive as TSQLTransaction).Active then
+    (FTransactionActive as TSQLTransaction).StartTransaction;
+end;
+
+procedure TDriverSQLdbTransaction.Commit;
+begin
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined.');
+
+  if (FTransactionActive as TSQLTransaction).Active then
+    (FTransactionActive as TSQLTransaction).Commit;
+end;
+
+procedure TDriverSQLdbTransaction.Rollback;
+begin
+  if not Assigned(FTransactionActive) then
+    raise Exception.Create('The active transaction is not defined.');
+
+  if (FTransactionActive as TSQLTransaction).Active then
+    (FTransactionActive as TSQLTransaction).Rollback;
 end;
 
 end.

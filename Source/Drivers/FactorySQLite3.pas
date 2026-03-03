@@ -1,25 +1,14 @@
 {
-  DBE Brasil é um Engine de Conexão simples e descomplicado for Delphi/Lazarus
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-                   Copyright (c) 2016, Isaque Pinheiro
-                          All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-                    GNU Lesser General Public License
-                      Versão 3, 29 de junho de 2007
-
-       Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
-       A todos é permitido copiar e distribuir cópias deste documento de
-       licença, mas mudá-lo não é permitido.
-
-       Esta versão da GNU Lesser General Public License incorpora
-       os termos e condições da versão 3 da GNU General Public License
-       Licença, complementado pelas permissões adicionais listadas no
-       arquivo LICENSE na pasta principal.
-}
-
-{ @abstract(DBE Framework)
-  @created(20 Jul 2016)
-  @author(Isaque Pinheiro <https://www.isaquepinheiro.com.br>)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit FactorySQLite3;
@@ -27,25 +16,24 @@ unit FactorySQLite3;
 interface
 
 uses
-  DB,
-  Classes,
-  SysUtils,
+  System.Classes,
+  System.SysUtils,
+  Data.DB,
   SQLiteTable3,
-  // DBE
-  DBE.FactoryConnection,
-  DBE.FactoryInterfaces;
+  FactoryConnection,
+  FactoryInterfaces,
+  DriverConnection;
 
 type
-  // Fábrica de conexão concreta com dbExpress
-  TFactorySQLite = class(TFactoryConnection)
+  TFactorySQLite3 = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TSQLiteDatabase;
-      const ADriverName: TDriverName); overload;
+      const ADriverName: TDBEngineDriver); overload;
     constructor Create(const AConnection: TSQLiteDatabase;
-      const ADriverName: TDriverName;
+      const ADriverName: TDBEngineDriver;
       const AMonitor: ICommandMonitor); overload;
     constructor Create(const AConnection: TSQLiteDatabase;
-      const ADriverName: TDriverName;
+      const ADriverName: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -54,51 +42,55 @@ type
 implementation
 
 uses
-  dbe.driver.sqlite3,
-  dbe.driver.sqlite3.transaction;
+  DriverSQLite3,
+  DriverSQLite3Transaction;
 
-{ TFactorySQLite }
+{ TFactorySQLite3 }
 
-constructor TFactorySQLite.Create(const AConnection: TSQLiteDatabase;
-  const ADriverName: TDriverName);
+constructor TFactorySQLite3.Create(const AConnection: TSQLiteDatabase;
+  const ADriverName: TDBEngineDriver);
 begin
   FDriverTransaction := TDriverSQLite3Transaction.Create(AConnection);
   FDriverConnection  := TDriverSQLite3.Create(AConnection,
                                               FDriverTransaction,
                                               ADriverName,
-                                              FCommandMonitor,
-                                              FMonitorCallback);
+                                              nil);
   FAutoTransaction := False;
 end;
 
-constructor TFactorySQLite.Create(const AConnection: TSQLiteDatabase;
-  const ADriverName: TDriverName; const AMonitor: ICommandMonitor);
+constructor TFactorySQLite3.Create(const AConnection: TSQLiteDatabase;
+  const ADriverName: TDBEngineDriver; const AMonitor: ICommandMonitor);
 begin
-  Create(AConnection, ADriverName);
   FCommandMonitor := AMonitor;
+  Create(AConnection, ADriverName);
 end;
 
-procedure TFactorySQLite.AddTransaction(const AKey: String;
+constructor TFactorySQLite3.Create(const AConnection: TSQLiteDatabase;
+  const ADriverName: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+begin
+  FDriverTransaction := TDriverSQLite3Transaction.Create(AConnection);
+  FDriverConnection  := TDriverSQLite3.Create(AConnection,
+                                              FDriverTransaction,
+                                              ADriverName,
+                                              AMonitorCallback);
+  FMonitorCallback := AMonitorCallback;
+  FAutoTransaction := False;
+end;
+
+destructor TFactorySQLite3.Destroy;
+begin
+  FreeAndNil(FDriverConnection);
+  FreeAndNil(FDriverTransaction);
+  inherited;
+end;
+
+procedure TFactorySQLite3.AddTransaction(const AKey: String;
   const ATransaction: TComponent);
 begin
   if not (ATransaction is TSQLiteDatabase) then
     raise Exception.Create('Invalid transaction type. Expected TSQLiteDatabase.');
 
   inherited AddTransaction(AKey, ATransaction);
-end;
-
-constructor TFactorySQLite.Create(const AConnection: TSQLiteDatabase;
-  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
-begin
-  Create(AConnection, ADriverName);
-  FMonitorCallback := AMonitorCallback;
-end;
-
-destructor TFactorySQLite.Destroy;
-begin
-  FDriverConnection.Free;
-  FDriverTransaction.Free;
-  inherited;
 end;
 
 end.

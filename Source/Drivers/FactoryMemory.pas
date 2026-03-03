@@ -1,27 +1,14 @@
 ﻿{
-                          Apache License
-                      Version 2.0, January 2004
-                   http://www.apache.org/licenses/
+  ------------------------------------------------------------------------------
+  DataEngine
+  Modular and extensible database engine framework for Delphi.
 
-       Licensed under the Apache License, Version 2.0 (the "License");
-       you may not use this file except in compliance with the License.
-       You may obtain a copy of the License at
+  SPDX-License-Identifier: Apache-2.0
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
-             http://www.apache.org/licenses/LICENSE-2.0
-
-       Unless required by applicable law or agreed to in writing, software
-       distributed under the License is distributed on an "AS IS" BASIS,
-       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-       See the License for the specific language governing permissions and
-       limitations under the License.
-}
-
-{
-  @abstract(DBEngine4D: Database Engine Framework for Delphi)
-  @description(A flexible and modular database engine framework for Delphi applications)
-  @created(03 Abr 2025)
-  @author(Isaque Pinheiro <isaquepsp@gmail.com>)
-  @Discord(https://discord.gg/T2zJC8zX)
+  Licensed under the Apache License, Version 2.0.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
 }
 
 unit FactoryMemory;
@@ -31,56 +18,68 @@ interface
 uses
   Classes,
   SysUtils,
-  DBEngine.FactoryInterfaces,
-  DBEngine.FactoryConnection,
-  DBEngine.DriverMemory;
+  FactoryConnection,
+  FactoryInterfaces,
+  DriverMemory;
 
 type
   TFactoryMemory = class(TFactoryConnection)
   public
-    constructor Create(const AConnection: TComponent; const ADriverName: TDBEDriver); overload;
-    constructor Create(const AConnection: TComponent; const ADriverName: TDBEDriver;
+    constructor Create(const AConnection: TComponent; const ADriver: TDBEngineDriver); overload;
+    constructor Create(const AConnection: TComponent; const ADriver: TDBEngineDriver;
       const AMonitor: ICommandMonitor); overload;
-    constructor Create(const AConnection: TComponent; const ADriverName: TDBEDriver;
+    constructor Create(const AConnection: TComponent; const ADriver: TDBEngineDriver;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
+    procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
   end;
 
 implementation
 
 uses
-  DBEngine.DriverMemoryTransaction;
+  DriverMemoryTransaction;
 
-constructor TFactoryMemory.Create(const AConnection: TComponent; const ADriverName: TDBEDriver);
+{ TFactoryMemory }
+
+constructor TFactoryMemory.Create(const AConnection: TComponent;
+  const ADriver: TDBEngineDriver);
 begin
+  // Create driver transaction first, which expects TMemoryConnection
   FDriverTransaction := TDriverMemoryTransaction.Create(AConnection);
-  FDriverConnection := TMemoryDriver.Create(AConnection,
+  
+  // Create driver connection
+  FDriverConnection := TDriverMemory.Create(AConnection,
                                             FDriverTransaction,
-                                            ADriverName,
+                                            ADriver,
                                             FMonitorCallback);
+  FAutoTransaction := False;
 end;
 
 constructor TFactoryMemory.Create(const AConnection: TComponent;
-  const ADriverName: TDBEDriver; const AMonitorCallback: TMonitorProc);
+  const ADriver: TDBEngineDriver; const AMonitor: ICommandMonitor);
+begin
+  FCommandMonitor := AMonitor;
+  Create(AConnection, ADriver);
+end;
+
+constructor TFactoryMemory.Create(const AConnection: TComponent;
+  const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
 begin
   FMonitorCallback := AMonitorCallback;
-  Create(AConnection, ADriverName);
-end;
-
-constructor TFactoryMemory.Create(const AConnection: TComponent;
-  const ADriverName: TDBEDriver; const AMonitor: ICommandMonitor);
-begin
-  Create(AConnection, ADriverName);
-  FCommandMonitor := AMonitor;
+  Create(AConnection, ADriver);
 end;
 
 destructor TFactoryMemory.Destroy;
 begin
-  if Assigned(FDriverConnection) then
-    FDriverConnection.Free;
-  if Assigned(FDriverTransaction) then
-    FDriverTransaction.Free;
+  FDriverConnection.Free;
+  FDriverTransaction.Free;
   inherited;
+end;
+
+procedure TFactoryMemory.AddTransaction(const AKey: String;
+  const ATransaction: TComponent);
+begin
+  inherited AddTransaction(AKey, ATransaction);
 end;
 
 end.

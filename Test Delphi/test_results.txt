@@ -1,0 +1,613 @@
+**********************************************************************
+*        DUnitX - (c) 2015-2020 Vincent Parrett & Contributors       *
+*                                                                    *
+*        License - http://www.apache.org/licenses/LICENSE-2.0        *
+**********************************************************************
+
+  Fixture : Tests
+  -------------------------------------------------
+     Fixture : Tests.Driver
+     -------------------------------------------------
+        Fixture : Tests.Driver.Memory
+        -------------------------------------------------
+           Fixture : Tests.Driver.Memory.TTestMemoryDriverConnection
+           -------------------------------------------------
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestConnect
+             -------------------------------------------------
+             Running Setup for : TestConnect
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestConnect
+             
+               [Transaction: ] - Connected to Memory DB
+             
+              Running Teardown for Test : TestConnect
+              
+               [Transaction: ] - Disconnected from Memory DB
+               Success : [Transaction: ] - Connected to Memory DB
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestDisconnect
+             -------------------------------------------------
+             Running Setup for : TestDisconnect
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestDisconnect
+             
+             
+              Running Teardown for Test : TestDisconnect
+              
+               Success.
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestExecuteDirect
+             -------------------------------------------------
+             Running Setup for : TestExecuteDirect
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestExecuteDirect
+             
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_0' WHERE CLIENT_ID = 1
+               [Transaction: ] - Update SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TESTCLIENT_0' WHERE CLIENT_ID = 1
+               [Transaction: ] - Where: CLIENT_ID = 1
+               [Transaction: ] - Record 0: CLIENT_ID = 1
+               [Transaction: ] - Updated: CLIENT_NAME = TESTCLIENT_0
+               [Transaction: ] - Rows affected: 1
+               [Transaction: MemoryTransaction] - UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_0' WHERE CLIENT_ID = 1
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 1
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 1, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+             
+              Running Teardown for Test : TestExecuteDirect
+              
+               [Transaction: ] - Destroying TMemoryDataSet, RecordCount=1
+               [Transaction: ] - Freeing TMemoryRecord with 2 fields
+               Success : [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_0' WHERE CLIENT_ID = 1
+               [Transaction: ] - Update SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TESTCLIENT_0' WHERE CLIENT_ID = 1
+               [Transaction: ] - Where: CLIENT_ID = 1
+               [Transaction: ] - Record 0: CLIENT_ID = 1
+               [Transaction: ] - Updated: CLIENT_NAME = TESTCLIENT_0
+               [Transaction: ] - Rows affected: 1
+               [Transaction: MemoryTransaction] - UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_0' WHERE CLIENT_ID = 1
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 1
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 1, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestExecuteDirectParams
+             -------------------------------------------------
+             Running Setup for : TestExecuteDirectParams
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestExecuteDirectParams
+             
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_313' WHERE CLIENT_ID = 1
+               [Transaction: ] - Update SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TESTCLIENT_313' WHERE CLIENT_ID = 1
+               [Transaction: ] - Where: CLIENT_ID = 1
+               [Transaction: ] - Record 0: CLIENT_ID = 1
+               [Transaction: ] - Updated: CLIENT_NAME = TESTCLIENT_313
+               [Transaction: ] - Rows affected: 1
+               [Transaction: MemoryTransaction] - UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_313' WHERE CLIENT_ID = 1
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 1
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 1, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+             
+              Running Teardown for Test : TestExecuteDirectParams
+              
+               [Transaction: ] - Destroying TMemoryDataSet, RecordCount=1
+               [Transaction: ] - Freeing TMemoryRecord with 2 fields
+               Success : [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_313' WHERE CLIENT_ID = 1
+               [Transaction: ] - Update SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TESTCLIENT_313' WHERE CLIENT_ID = 1
+               [Transaction: ] - Where: CLIENT_ID = 1
+               [Transaction: ] - Record 0: CLIENT_ID = 1
+               [Transaction: ] - Updated: CLIENT_NAME = TESTCLIENT_313
+               [Transaction: ] - Rows affected: 1
+               [Transaction: MemoryTransaction] - UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_313' WHERE CLIENT_ID = 1
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 1
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 1, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestExecuteScript
+             -------------------------------------------------
+             Running Setup for : TestExecuteScript
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestExecuteScript
+             
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing script command: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'ScriptClient')
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'ScriptClient')
+               [Transaction: ] - Insert CLIENT_ID: 2 -> 2
+               [Transaction: ] - Insert CLIENT_NAME: SCRIPTCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 2
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'ScriptClient')
+               [Transaction: ] - Executing script command: UPDATE CLIENTES SET CLIENT_NAME = 'UpdatedScript' WHERE CLIENT_ID = 2
+               [Transaction: ] - Executing SQL: UPDATE CLIENTES SET CLIENT_NAME = 'UpdatedScript' WHERE CLIENT_ID = 2
+               [Transaction: ] - Update SQL: UPDATE CLIENTES SET CLIENT_NAME = 'UPDATEDSCRIPT' WHERE CLIENT_ID = 2
+               [Transaction: ] - Where: CLIENT_ID = 2
+               [Transaction: ] - Record 0: CLIENT_ID = 1
+               [Transaction: ] - Record 1: CLIENT_ID = 2
+               [Transaction: ] - Updated: CLIENT_NAME = UPDATEDSCRIPT
+               [Transaction: ] - Rows affected: 1
+               [Transaction: MemoryTransaction] - UPDATE CLIENTES SET CLIENT_NAME = 'UpdatedScript' WHERE CLIENT_ID = 2
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 2
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 2
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 2, Match=False
+               [Transaction: ] - WHERE CLIENT_ID: 2 = 2, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+             
+              Running Teardown for Test : TestExecuteScript
+              
+               [Transaction: ] - Destroying TMemoryDataSet, RecordCount=1
+               [Transaction: ] - Freeing TMemoryRecord with 2 fields
+               Success : [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing script command: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'ScriptClient')
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'ScriptClient')
+               [Transaction: ] - Insert CLIENT_ID: 2 -> 2
+               [Transaction: ] - Insert CLIENT_NAME: SCRIPTCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 2
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'ScriptClient')
+               [Transaction: ] - Executing script command: UPDATE CLIENTES SET CLIENT_NAME = 'UpdatedScript' WHERE CLIENT_ID = 2
+               [Transaction: ] - Executing SQL: UPDATE CLIENTES SET CLIENT_NAME = 'UpdatedScript' WHERE CLIENT_ID = 2
+               [Transaction: ] - Update SQL: UPDATE CLIENTES SET CLIENT_NAME = 'UPDATEDSCRIPT' WHERE CLIENT_ID = 2
+               [Transaction: ] - Where: CLIENT_ID = 2
+               [Transaction: ] - Record 0: CLIENT_ID = 1
+               [Transaction: ] - Record 1: CLIENT_ID = 2
+               [Transaction: ] - Updated: CLIENT_NAME = UPDATEDSCRIPT
+               [Transaction: ] - Rows affected: 1
+               [Transaction: MemoryTransaction] - UPDATE CLIENTES SET CLIENT_NAME = 'UpdatedScript' WHERE CLIENT_ID = 2
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 2
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 2
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 2, Match=False
+               [Transaction: ] - WHERE CLIENT_ID: 2 = 2, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestAddScript
+             -------------------------------------------------
+             Running Setup for : TestAddScript
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestAddScript
+             
+             
+              Running Teardown for Test : TestAddScript
+              
+               Success.
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestExecuteScripts
+             -------------------------------------------------
+             Running Setup for : TestExecuteScripts
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestExecuteScripts
+             
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (4, 'ScriptTest')
+               [Transaction: ] - Insert CLIENT_ID: 4 -> 4
+               [Transaction: ] - Insert CLIENT_NAME: SCRIPTTEST
+               [Transaction: ] - Inserted record in CLIENTES, count = 2
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (4, 'ScriptTest')
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 4
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 4
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 4, Match=False
+               [Transaction: ] - WHERE CLIENT_ID: 4 = 4, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+             
+              Running Teardown for Test : TestExecuteScripts
+              
+               [Transaction: ] - Destroying TMemoryDataSet, RecordCount=1
+               [Transaction: ] - Freeing TMemoryRecord with 2 fields
+               Success : [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (4, 'ScriptTest')
+               [Transaction: ] - Insert CLIENT_ID: 4 -> 4
+               [Transaction: ] - Insert CLIENT_NAME: SCRIPTTEST
+               [Transaction: ] - Inserted record in CLIENTES, count = 2
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (4, 'ScriptTest')
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 4
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 4
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 4, Match=False
+               [Transaction: ] - WHERE CLIENT_ID: 4 = 4, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestIsConnected
+             -------------------------------------------------
+             Running Setup for : TestIsConnected
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestIsConnected
+             
+               [Transaction: ] - Connected to Memory DB
+             
+              Running Teardown for Test : TestIsConnected
+              
+               [Transaction: ] - Disconnected from Memory DB
+               Success : [Transaction: ] - Connected to Memory DB
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestInTransaction
+             -------------------------------------------------
+             Running Setup for : TestInTransaction
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestInTransaction
+             
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Disconnected from Memory DB
+             
+              Running Teardown for Test : TestInTransaction
+              
+               Success : [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Disconnected from Memory DB
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestCreateQuery
+             -------------------------------------------------
+             Running Setup for : TestCreateQuery
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestCreateQuery
+             
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_8609' WHERE CLIENT_ID = 1
+               [Transaction: ] - Update SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TESTCLIENT_8609' WHERE CLIENT_ID = 1
+               [Transaction: ] - Where: CLIENT_ID = 1
+               [Transaction: ] - Record 0: CLIENT_ID = 1
+               [Transaction: ] - Updated: CLIENT_NAME = TESTCLIENT_8609
+               [Transaction: ] - Rows affected: 1
+               [Transaction: MemoryTransaction] - UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_8609' WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 1
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 1, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+             
+              Running Teardown for Test : TestCreateQuery
+              
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Destroying TMemoryDataSet, RecordCount=1
+               [Transaction: ] - Freeing TMemoryRecord with 2 fields
+               Success : [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_8609' WHERE CLIENT_ID = 1
+               [Transaction: ] - Update SQL: UPDATE CLIENTES SET CLIENT_NAME = 'TESTCLIENT_8609' WHERE CLIENT_ID = 1
+               [Transaction: ] - Where: CLIENT_ID = 1
+               [Transaction: ] - Record 0: CLIENT_ID = 1
+               [Transaction: ] - Updated: CLIENT_NAME = TESTCLIENT_8609
+               [Transaction: ] - Rows affected: 1
+               [Transaction: MemoryTransaction] - UPDATE CLIENTES SET CLIENT_NAME = 'TestClient_8609' WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 1
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 1, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestCreateDataSet
+             -------------------------------------------------
+             Running Setup for : TestCreateDataSet
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestCreateDataSet
+             
+               [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 1
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 1, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+             
+              Running Teardown for Test : TestCreateDataSet
+              
+               [Transaction: ] - Destroying TMemoryDataSet, RecordCount=1
+               [Transaction: ] - Freeing TMemoryRecord with 2 fields
+               Success : [Transaction: ] - Parsing SQL: SELECT * FROM CLIENTES WHERE CLIENT_ID = 1
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=, Condition=, Where=CLIENT_ID = 1
+               [Transaction: ] - WHERE CLIENT_ID: 1 = 1, Match=True
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestStartTransaction
+             -------------------------------------------------
+             Running Setup for : TestStartTransaction
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestStartTransaction
+             
+               [Transaction: ] - Connected to Memory DB
+             
+              Running Teardown for Test : TestStartTransaction
+              
+               [Transaction: ] - Disconnected from Memory DB
+               Success : [Transaction: ] - Connected to Memory DB
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestCommit
+             -------------------------------------------------
+             Running Setup for : TestCommit
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestCommit
+             
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Disconnected from Memory DB
+             
+              Running Teardown for Test : TestCommit
+              
+               Success : [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Disconnected from Memory DB
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestRollback
+             -------------------------------------------------
+             Running Setup for : TestRollback
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestRollback
+             
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Disconnected from Memory DB
+             
+              Running Teardown for Test : TestRollback
+              
+               Success : [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Disconnected from Memory DB
+            
+             Test : Tests.Driver.Memory.TTestMemoryDriverConnection.TestFluentQuery
+             -------------------------------------------------
+             Running Setup for : TestFluentQuery
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: INITIALCLIENT
+               [Transaction: ] - Inserted record in CLIENTES, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'InitialClient')
+               [Transaction: ] - Disconnected from Memory DB
+             
+             Executing Test : TestFluentQuery
+             
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'TestClient1')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: TESTCLIENT1
+               [Transaction: ] - Inserted record in CLIENTES, count = 2
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'TestClient1')
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'TestClient2')
+               [Transaction: ] - Insert CLIENT_ID: 2 -> 2
+               [Transaction: ] - Insert CLIENT_NAME: TESTCLIENT2
+               [Transaction: ] - Inserted record in CLIENTES, count = 3
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'TestClient2')
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO PEDIDOS (PEDIDO_ID, CLIENT_ID, PEDIDO_VALOR) VALUES (1, 1, 150.00)
+               [Transaction: ] - Insert PEDIDO_ID: 1
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert PEDIDO_VALOR: 150.00
+               [Transaction: ] - Inserted record in PEDIDOS, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO PEDIDOS (PEDIDO_ID, CLIENT_ID, PEDIDO_VALOR) VALUES (1, 1, 150.00)
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO PEDIDOS (PEDIDO_ID, CLIENT_ID, PEDIDO_VALOR) VALUES (2, 2, 80.00)
+               [Transaction: ] - Insert PEDIDO_ID: 2
+               [Transaction: ] - Insert CLIENT_ID: 2 -> 2
+               [Transaction: ] - Insert PEDIDO_VALOR: 80.00
+               [Transaction: ] - Inserted record in PEDIDOS, count = 2
+               [Transaction: MemoryTransaction] - INSERT INTO PEDIDOS (PEDIDO_ID, CLIENT_ID, PEDIDO_VALOR) VALUES (2, 2, 80.00)
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT CLIENTES.CLIENT_NAME, PEDIDOS.PEDIDO_VALOR FROM CLIENTES INNER JOIN PEDIDOS ON CLIENTES.CLIENT_ID = PEDIDOS.CLIENT_ID WHERE CLIENTES.CLIENT_NAME LIKE 'Test%' AND PEDIDOS.PEDIDO_VALOR > 100.00
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=PEDIDOS, Condition=CLIENTES.CLIENT_ID = PEDIDOS.CLIENT_ID, Where=CLIENTES.CLIENT_NAME LIKE 'Test%' AND PEDIDOS.PEDIDO_VALOR > 100.00
+               [Transaction: ] - Parsing join condition: CLIENTES.CLIENT_ID = PEDIDOS.CLIENT_ID
+               [Transaction: ] - Parsed join: Left=CLIENT_ID, Right=CLIENT_ID
+               [Transaction: ] - Join condition: CLIENT_ID = CLIENT_ID
+               [Transaction: ] - Join match: CLIENT_ID=1, CLIENT_ID=1
+               [Transaction: ] - Join match: CLIENT_ID=1, CLIENT_ID=1
+               [Transaction: ] - Join match: CLIENT_ID=2, CLIENT_ID=2
+               [Transaction: ] - WHERE LIKE: CLIENTES.CLIENT_NAME LIKE TEST%, Match=False
+               [Transaction: ] - WHERE PEDIDOS.PEDIDO_VALOR: 150,00 > 100,00, Match=False
+               [Transaction: ] - WHERE LIKE: CLIENTES.CLIENT_NAME LIKE TEST%, Match=True
+               [Transaction: ] - WHERE PEDIDOS.PEDIDO_VALOR: 150,00 > 100,00, Match=True
+               [Transaction: ] - WHERE LIKE: CLIENTES.CLIENT_NAME LIKE TEST%, Match=True
+               [Transaction: ] - WHERE PEDIDOS.PEDIDO_VALOR: 80,00 > 100,00, Match=False
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+               [Transaction: ] - Eof checked: Active=True, Index=0, Count=1, Result=False
+               TestFluentQuery: CLIENT_NAME=TESTCLIENT1, PEDIDO_VALOR=150
+               [Transaction: ] - DataSet closed
+               [Transaction: ] - Destroying TMemoryDataSet, RecordCount=1
+               [Transaction: ] - Freeing TMemoryRecord with 5 fields
+             
+              Running Teardown for Test : TestFluentQuery
+              
+               Success : [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'TestClient1')
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert CLIENT_NAME: TESTCLIENT1
+               [Transaction: ] - Inserted record in CLIENTES, count = 2
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (1, 'TestClient1')
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'TestClient2')
+               [Transaction: ] - Insert CLIENT_ID: 2 -> 2
+               [Transaction: ] - Insert CLIENT_NAME: TESTCLIENT2
+               [Transaction: ] - Inserted record in CLIENTES, count = 3
+               [Transaction: MemoryTransaction] - INSERT INTO CLIENTES (CLIENT_ID, CLIENT_NAME) VALUES (2, 'TestClient2')
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO PEDIDOS (PEDIDO_ID, CLIENT_ID, PEDIDO_VALOR) VALUES (1, 1, 150.00)
+               [Transaction: ] - Insert PEDIDO_ID: 1
+               [Transaction: ] - Insert CLIENT_ID: 1 -> 1
+               [Transaction: ] - Insert PEDIDO_VALOR: 150.00
+               [Transaction: ] - Inserted record in PEDIDOS, count = 1
+               [Transaction: MemoryTransaction] - INSERT INTO PEDIDOS (PEDIDO_ID, CLIENT_ID, PEDIDO_VALOR) VALUES (1, 1, 150.00)
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Connected to Memory DB
+               [Transaction: ] - Executing SQL: INSERT INTO PEDIDOS (PEDIDO_ID, CLIENT_ID, PEDIDO_VALOR) VALUES (2, 2, 80.00)
+               [Transaction: ] - Insert PEDIDO_ID: 2
+               [Transaction: ] - Insert CLIENT_ID: 2 -> 2
+               [Transaction: ] - Insert PEDIDO_VALOR: 80.00
+               [Transaction: ] - Inserted record in PEDIDOS, count = 2
+               [Transaction: MemoryTransaction] - INSERT INTO PEDIDOS (PEDIDO_ID, CLIENT_ID, PEDIDO_VALOR) VALUES (2, 2, 80.00)
+               [Transaction: ] - Disconnected from Memory DB
+               [Transaction: ] - Parsing SQL: SELECT CLIENTES.CLIENT_NAME, PEDIDOS.PEDIDO_VALOR FROM CLIENTES INNER JOIN PEDIDOS ON CLIENTES.CLIENT_ID = PEDIDOS.CLIENT_ID WHERE CLIENTES.CLIENT_NAME LIKE 'Test%' AND PEDIDOS.PEDIDO_VALOR > 100.00
+               [Transaction: ] - Parsed: Table=CLIENTES, Join=PEDIDOS, Condition=CLIENTES.CLIENT_ID = PEDIDOS.CLIENT_ID, Where=CLIENTES.CLIENT_NAME LIKE 'Test%' AND PEDIDOS.PEDIDO_VALOR > 100.00
+               [Transaction: ] - Parsing join condition: CLIENTES.CLIENT_ID = PEDIDOS.CLIENT_ID
+               [Transaction: ] - Parsed join: Left=CLIENT_ID, Right=CLIENT_ID
+               [Transaction: ] - Join condition: CLIENT_ID = CLIENT_ID
+               [Transaction: ] - Join match: CLIENT_ID=1, CLIENT_ID=1
+               [Transaction: ] - Join match: CLIENT_ID=1, CLIENT_ID=1
+               [Transaction: ] - Join match: CLIENT_ID=2, CLIENT_ID=2
+               [Transaction: ] - WHERE LIKE: CLIENTES.CLIENT_NAME LIKE TEST%, Match=False
+               [Transaction: ] - WHERE PEDIDOS.PEDIDO_VALOR: 150,00 > 100,00, Match=False
+               [Transaction: ] - WHERE LIKE: CLIENTES.CLIENT_NAME LIKE TEST%, Match=True
+               [Transaction: ] - WHERE PEDIDOS.PEDIDO_VALOR: 150,00 > 100,00, Match=True
+               [Transaction: ] - WHERE LIKE: CLIENTES.CLIENT_NAME LIKE TEST%, Match=True
+               [Transaction: ] - WHERE PEDIDOS.PEDIDO_VALOR: 80,00 > 100,00, Match=False
+               [Transaction: ] - WHERE result count: 1
+               [Transaction: ] - Select result count: 1
+               [Transaction: ] - Moved to first record
+               [Transaction: ] - DataSet opened, moved to first record, Index=0
+               [Transaction: ] - Eof checked: Active=True, Index=0, Count=1, Result=False
+               TestFluentQuery: CLIENT_NAME=TESTCLIENT1, PEDIDO_VALOR=150
+               [Transaction: ] - DataSet closed
+               [Transaction: ] - Destroying TMemoryDataSet, RecordCount=1
+               [Transaction: ] - Freeing TMemoryRecord with 5 fields
+            
+            Running Fixture Teardown Method : Destroy
+            
+         
+      
+   
+
+Done testing.
+Tests Found   : 15
+Tests Ignored : 0
+Tests Passed  : 15
+Tests Leaked  : 0
+Tests Failed  : 0
+Tests Errored : 0
+Done.. press <Enter> key to quit.

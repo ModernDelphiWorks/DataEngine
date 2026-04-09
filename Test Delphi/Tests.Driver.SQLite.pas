@@ -9,7 +9,7 @@ uses
 
   SQLiteTable3,
 
-  DBE.DataEngine.FactoryInterfaces;
+  DataEngine.FactoryInterfaces;
 
 type
   [TestFixture]
@@ -57,7 +57,7 @@ type
 implementation
 
 uses
-  dbe.factory.sqlite3,
+  DataEngine.FactorySQLite3,
   Tests.DataEngine.Consts;
 
 { TTestDriverConnection }

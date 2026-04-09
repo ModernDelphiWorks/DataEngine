@@ -9,7 +9,7 @@ uses
 
   ABSMain,
 
-  DBE.DataEngine.FactoryInterfaces;
+  DataEngine.FactoryInterfaces;
 
 type
   [TestFixture]
@@ -57,7 +57,7 @@ type
 implementation
 
 uses
-  dbe.factory.absolutedb,
+  DataEngine.FactoryAbsoluteDB,
   Tests.DataEngine.Consts;
 
 { TTestDriverConnection }

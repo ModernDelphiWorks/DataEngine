@@ -79,6 +79,7 @@ type
     procedure Prepare; override;
     procedure Unprepare; override;
     function ParamByName(const AValue: string): TParam; override;
+    function RowsAffected: UInt32; override;
   end;
 
   TDriverDataSetDBExpress = class(TDriverDataSet<TClientDataSet>)
@@ -398,12 +399,12 @@ end;
 
 procedure TDriverQueryDBExpress.Prepare;
 begin
-  FSQLQuery.Prepare;
+  FSQLQuery.Prepared := True;
 end;
 
 procedure TDriverQueryDBExpress.Unprepare;
 begin
-  FSQLQuery.Unprepare;
+  FSQLQuery.Prepared := False;
 end;
 
 function TDriverQueryDBExpress.ParamByName(const AValue: string): TParam;
@@ -440,7 +441,7 @@ begin
     LExeSQL.SQL.Text := FSQLQuery.SQL.Text;
 
     if FSQLQuery.Params.Count > 0 then
-      _UpdateNativeParams(LExeSQL.Params, FSQLQuery.Params);
+      LExeSQL.Params.Assign(FSQLQuery.Params);
 
     LExeSQL.ExecSQL;
     FRowsAffected := LExeSQL.RowsAffected;

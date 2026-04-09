@@ -11,7 +11,7 @@ uses
   Data.DbxSqlite,
   Datasnap.DBClient,
 
-  DataEngine.DataEngine.FactoryInterfaces;
+  DataEngine.FactoryInterfaces;
 
 type
   [TestFixture]
@@ -59,7 +59,7 @@ type
 implementation
 
 uses
-  DataEngine.DataEngine.FactoryDBExpress,
+  DataEngine.FactoryDBExpress,
   Tests.DataEngine.Consts;
 
 { TTestDriverConnection }

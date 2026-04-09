@@ -10,7 +10,7 @@ uses
   Uni,
   UniScript,
   SQLiteUniProvider,
-  DBE.DataEngine.FactoryInterfaces;
+  DataEngine.FactoryInterfaces;
 
 type
   [TestFixture]
@@ -59,7 +59,7 @@ type
 implementation
 
 uses
-  dbe.factory.unidac,
+  DataEngine.FactoryUniDAC,
   Tests.DataEngine.Consts;
 
 { TTestDriverConnection }

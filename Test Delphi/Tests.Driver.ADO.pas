@@ -10,7 +10,7 @@ uses
   ADODB,
   ActiveX,
 
-  DBE.DataEngine.FactoryInterfaces;
+  DataEngine.FactoryInterfaces;
 
 type
   [TestFixture]
@@ -58,7 +58,7 @@ type
 implementation
 
 uses
-  DBE.DataEngine.FactoryADO,
+  DataEngine.FactoryADO,
   Tests.DataEngine.Consts;
 
 { TTestDriverConnection }

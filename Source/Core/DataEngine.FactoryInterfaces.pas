@@ -414,12 +414,12 @@ begin
 end;
 
 constructor TMonitorParam.Create(const AEventType: TMonitorEventType; const ACommand: String;
-  APParams: TParams; const AExecutionTime: Int64; const AFetchTime: Int64;
+  AParams: TParams; const AExecutionTime: Int64; const AFetchTime: Int64;
   const ARowsAffected: UInt32; const AException: Exception);
 begin
   EventType := AEventType;
   Command := ACommand;
-  Params := APParams;
+  Params := AParams;
   ExecutionTime := AExecutionTime;
   FetchTime := AFetchTime;
   RowsAffected := ARowsAffected;

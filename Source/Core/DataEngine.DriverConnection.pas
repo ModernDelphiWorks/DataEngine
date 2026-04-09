@@ -987,9 +987,7 @@ procedure TDriverDataSetBase._SetActive(const Value: Boolean);
 begin
 end;
 
-procedure TDriverDataSetBase._SetCommandText(const ACommandText: String);
-begin
-end;
+
 
 procedure TDriverDataSetBase._SetUniDirectional(const Value: Boolean);
 begin
@@ -1801,9 +1799,7 @@ procedure TDriverDataSet<T>._SetCachedUpdates(const Value: Boolean);
 begin
 end;
 
-procedure TDriverDataSet<T>._SetCommandText(const ACommandText: String);
-begin
-end;
+
 
 procedure TDriverDataSet<T>._SetFetchingAll(const Value: Boolean);
 begin

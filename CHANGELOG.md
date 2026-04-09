@@ -6,6 +6,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Fixed
+- **Driver Robustness**: Standardized `IDBConnection` internal interfaces across legacy drivers and resolved namespace collisions in test fixtures (Issue #35).
+
 ## [0.17.2] - 2026-04-09
 ### Fixed
 - **Transaction Consistency**: Fixed regression in `TFactoryConnection.StartTransaction` that prevented legacy drivers (direct DBExpress) from initializing their 'DEFAULT' transaction lazily (Issue #35).

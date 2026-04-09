@@ -35,6 +35,8 @@ Este documento delineia a evolução passada e os objetivos futuros do projeto *
 - [x] **SPRINT-14: Native Driver Streaming** — Implementação de fetching incremental nativo nos principais drivers. (v0.14.0)
 - [x] **SPRINT-15: Connection Resiliency & Health Checks** — Implementação de Retry Policy e verificações de integridade de conexão (Ping-Alive). (v0.15.0)
 - [x] **SPRINT-16: Advanced Observability** — Métricas de performance de query, estruturação do MonitorCallback para telemetria e detecção de slow queries. (v0.16.0)
+- [ ] **SPRINT-17: Technical Debt & Stabilization** — Resolução de regressões de transação (Issue #35), refinamento de observers e padronização de drivers legados. (v0.17.x)
+
 
 
 ## Visão de Longo Prazo

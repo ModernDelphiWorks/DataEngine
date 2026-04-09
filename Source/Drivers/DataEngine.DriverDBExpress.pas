@@ -177,8 +177,6 @@ begin
   if FSQLScript.SQL.Count = 0 then
     raise Exception.Create('No SQL scripts found to execute.');
 
-  if _GetTransactionActive = nil then
-    raise Exception.Create('Transaction not assigned.');
 
   try
     try
@@ -299,8 +297,6 @@ var
   LFor: Int16;
   LHasMetadataCache: Boolean;
 begin
-  if _GetTransactionActive = nil then
-    raise Exception.Create('Transaction not assigned.');
 
   LSQLQuery := TSQLQuery.Create(nil);
   LProvider := TDataSetProvider.Create(nil);
@@ -309,8 +305,8 @@ begin
     try
       LSQLQuery.SQLConnection := FSQLQuery.SQLConnection;
       LProvider.DataSet := LSQLQuery;
-      LProvider.Name := 'ProviderName';
-      LResultSet.ProviderName := LProvider.Name;
+      LProvider.Options := [poAllowCommandText];
+      LResultSet.SetProvider(LProvider);
       LResultSet.CommandText := FSQLQuery.SQL.Text;
 
       LHasMetadataCache := _TryApplyMetadataCache(LResultSet.CommandText, LResultSet.FieldDefs);

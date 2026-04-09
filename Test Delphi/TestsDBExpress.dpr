@@ -14,7 +14,7 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
   Tests.Driver.DBExpress in 'Tests.Driver.DBExpress.pas',
-  Tests.DataEngine.Consts in 'Tests.Consts.pas',
+  Tests.DataEngine.Consts in 'Tests.DataEngine.Consts.pas',
   DataEngine.DriverDBExpress in '..\Source\Drivers\DataEngine.DriverDBExpress.pas',
   DataEngine.DriverDBExpressTransaction in '..\Source\Drivers\DataEngine.DriverDBExpressTransaction.pas',
   DataEngine.FactoryDBExpress in '..\Source\Drivers\DataEngine.FactoryDBExpress.pas',

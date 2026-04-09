@@ -79,6 +79,7 @@ type
     procedure Prepare; override;
     procedure Unprepare; override;
     function ParamByName(const AValue: string): TParam; override;
+    function RowsAffected: UInt32; override;
   end;
 
   TDriverDataSetDBExpress = class(TDriverDataSet<TClientDataSet>)
@@ -176,8 +177,6 @@ begin
   if FSQLScript.SQL.Count = 0 then
     raise Exception.Create('No SQL scripts found to execute.');
 
-  if _GetTransactionActive = nil then
-    raise Exception.Create('Transaction not assigned.');
 
   try
     try
@@ -298,8 +297,6 @@ var
   LFor: Int16;
   LHasMetadataCache: Boolean;
 begin
-  if _GetTransactionActive = nil then
-    raise Exception.Create('Transaction not assigned.');
 
   LSQLQuery := TSQLQuery.Create(nil);
   LProvider := TDataSetProvider.Create(nil);
@@ -308,8 +305,8 @@ begin
     try
       LSQLQuery.SQLConnection := FSQLQuery.SQLConnection;
       LProvider.DataSet := LSQLQuery;
-      LProvider.Name := 'ProviderName';
-      LResultSet.ProviderName := LProvider.Name;
+      LProvider.Options := [poAllowCommandText];
+      LResultSet.SetProvider(LProvider);
       LResultSet.CommandText := FSQLQuery.SQL.Text;
 
       LHasMetadataCache := _TryApplyMetadataCache(LResultSet.CommandText, LResultSet.FieldDefs);
@@ -398,12 +395,12 @@ end;
 
 procedure TDriverQueryDBExpress.Prepare;
 begin
-  FSQLQuery.Prepare;
+  FSQLQuery.Prepared := True;
 end;
 
 procedure TDriverQueryDBExpress.Unprepare;
 begin
-  FSQLQuery.Unprepare;
+  FSQLQuery.Prepared := False;
 end;
 
 function TDriverQueryDBExpress.ParamByName(const AValue: string): TParam;
@@ -440,7 +437,7 @@ begin
     LExeSQL.SQL.Text := FSQLQuery.SQL.Text;
 
     if FSQLQuery.Params.Count > 0 then
-      _UpdateNativeParams(LExeSQL.Params, FSQLQuery.Params);
+      LExeSQL.Params.Assign(FSQLQuery.Params);
 
     LExeSQL.ExecSQL;
     FRowsAffected := LExeSQL.RowsAffected;

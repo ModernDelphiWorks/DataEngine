@@ -32,7 +32,7 @@ type
     procedure StartTransaction(const ALevel: TDBIsolationLevel = ilDefault); override;
     procedure Commit; override;
     procedure Rollback; override;
-    function InTransaction: Boolean; override;
+    function _InTransaction: Boolean; override;
   end;
 
 implementation
@@ -58,11 +58,8 @@ begin
   inherited;
 end;
 
-function TDriverWireMongoDBTransaction.InTransaction: Boolean;
+function TDriverWireMongoDBTransaction._InTransaction: Boolean;
 begin
-  if not Assigned(FTransactionActive) then
-    raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
-    
   // MongoDB doesn't strictly support multi-statement transactions in the same way as SQL,
   // or at least this wrapper implementation doesn't expose state.
   // Returning False implies no active transaction state to check against.

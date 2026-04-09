@@ -21,6 +21,9 @@ uses
   SysUtils,
   Generics.Collections,
   FireDAC.Comp.Client,
+  FireDAC.Stan.Intf,
+  FireDAC.Phys.Intf,
+  FireDAC.Stan.Option,
   DataEngine.DriverConnection,
   DataEngine.FactoryInterfaces;
 
@@ -35,23 +38,22 @@ type
     procedure StartTransaction(const ALevel: TDBIsolationLevel = ilDefault); override;
     procedure Commit; override;
     procedure Rollback; override;
-    function InTransaction: Boolean; override;
+  protected
+    function _InTransaction: Boolean; override;
   end;
 
 implementation
 
-function LevelToNativeFD(const ALevel: TDBIsolationLevel; const AMonitorCallback: TMonitorProc): TFDIsolationLevel;
+function LevelToNativeFD(const ALevel: TDBIsolationLevel; const AMonitorCallback: TMonitorProc): TFDTxIsolation;
 begin
   case ALevel of
-    ilReadUncommitted: Result := amReadUncommitted;
-    ilReadCommitted: Result := amReadCommitted;
-    ilRepeatableRead: Result := amRepeatableRead;
-    ilSerializable: Result := amSerializable;
-    ilSnapshot: Result := amSnapshot;
+    ilReadUncommitted: Result := xiDirtyRead;
+    ilReadCommitted: Result := xiReadCommitted;
+    ilRepeatableRead: Result := xiRepeatableRead;
+    ilSerializable: Result := xiReadCommitted; 
+    ilSnapshot: Result := xiReadCommitted;
   else
-    Result := amReadCommitted;
-    if Assigned(AMonitorCallback) then
-      AMonitorCallback(TMonitorParam.Create('[WARNING] FireDAC: Isolation level not supported. Falling back to ReadCommitted.', nil));
+    Result := xiReadCommitted;
   end;
 end;
 
@@ -103,9 +105,9 @@ begin
   (FTransactionActive as TFDTransaction).Rollback;
 end;
 
-function TDriverFireDACTransaction.InTransaction: Boolean;
+function TDriverFireDACTransaction._InTransaction: Boolean;
 begin
-  Result := Assigned(FTransactionActive) and (FTransactionActive as TFDTransaction).Active;
+  Result := (FTransactionActive as TFDTransaction).Active;
 end;
 
 end.

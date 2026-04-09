@@ -102,6 +102,7 @@ type
     FMonitorCallback: TMonitorProc;
     FLock: TCriticalSection;
     function _GetTransaction(const AKey: String): TComponent; virtual;
+    function _InTransaction: Boolean; virtual;
   public
     constructor Create(const AConnection: TComponent; const AMonitorCallback: TMonitorProc = nil); virtual;
     destructor Destroy; override;
@@ -987,9 +988,7 @@ procedure TDriverDataSetBase._SetActive(const Value: Boolean);
 begin
 end;
 
-procedure TDriverDataSetBase._SetCommandText(const ACommandText: String);
-begin
-end;
+
 
 procedure TDriverDataSetBase._SetUniDirectional(const Value: Boolean);
 begin
@@ -1801,9 +1800,7 @@ procedure TDriverDataSet<T>._SetCachedUpdates(const Value: Boolean);
 begin
 end;
 
-procedure TDriverDataSet<T>._SetCommandText(const ACommandText: String);
-begin
-end;
+
 
 procedure TDriverDataSet<T>._SetFetchingAll(const Value: Boolean);
 begin
@@ -2498,6 +2495,16 @@ begin
 end;
 
 function TDriverTransaction.InTransaction: Boolean;
+begin
+  FLock.Enter;
+  try
+    Result := Assigned(FTransactionActive) and _InTransaction;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TDriverTransaction._InTransaction: Boolean;
 begin
   Result := False;
 end;

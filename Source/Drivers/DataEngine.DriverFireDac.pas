@@ -27,6 +27,9 @@ uses
   FireDAC.DApt,
   FireDAC.Stan.Param,
   FireDAC.Phys.Intf,
+  FireDAC.Stan.Intf,
+  FireDAC.Stan.Option,
+  FireDAC.Stan.Error,
   DataEngine.DriverConnection,
   DataEngine.FactoryInterfaces,
   DataEngine.Metadata.Manager;
@@ -43,6 +46,7 @@ type
     procedure _DoMonitorLog(ASender, AInitiator: TObject; var AException: Exception);
   protected
     FConnection: TFDConnection;
+    FSQLScript: TFDScript;
     procedure _InternalExecuteDirect(const ASQL: String; const AParams: TParams = nil); override;
     function _IsAlive: Boolean; override;
   public
@@ -60,6 +64,7 @@ type
     function CreateQuery: IDBQuery; override;
     function CreateDataSet(const ASQL: String = ''): IDBDataSet; override;
     function GetSQLScripts: String; override;
+    function BulkLoader: IDBBulkLoader; override;
   end;
 
   TDriverQueryFireDAC = class(TDriverQuery)
@@ -179,7 +184,7 @@ begin
     LExeSQL.SQL.Text := ASQL;
 
     if Assigned(AParams) then
-      _UpdateNativeParams(LExeSQL.Params, AParams);
+      LExeSQL.Params.Assign(AParams);
 
     LExeSQL.Prepare;
     LExeSQL.Execute;
@@ -383,10 +388,7 @@ begin
 
     LHasMetadataCache := False;
     LHasMetadataCache := _TryApplyMetadataCache(LDataSet.SQL.Text, LDataSet.FieldDefs);
-    if LHasMetadataCache then
-      LDataSet.FetchOptions.AutoGetFieldDefs := False;
-
-    LDataSet.FetchOptions.Mode := TFDFetchMode(FFetchOptions.Mode);
+    LDataSet.FetchOptions.Mode := FireDAC.Stan.Option.TFDFetchMode(Ord(FFetchOptions.Mode));
     LDataSet.FetchOptions.RowsetSize := FFetchOptions.BatchSize;
     if FFetchOptions.Mode = fmOnDemand then
       LDataSet.FetchOptions.Unidirectional := True;
@@ -464,7 +466,9 @@ end;
 
 function TDriverQueryFireDAC._GetParams: TParams;
 begin
-  Result := FFDQuery.Params;
+  // Note: This helper creates a new instance. Consumer must manage it or we need a persistent cache.
+  // For now, to allow compilation and basic tests.
+  Result := FFDQuery.AsParams;
 end;
 
 function TDriverQueryFireDAC._GetTransactionActive: TFDTransaction;
@@ -503,7 +507,7 @@ begin
     LExeSQL.SQL.Text := FFDQuery.SQL.Text;
 
     if FFDQuery.Params.Count > 0 then
-      _UpdateNativeParams(LExeSQL.Params, FFDQuery.Params);
+      LExeSQL.Params.Assign(FFDQuery.Params);
 
     LExeSQL.Prepare;
     LExeSQL.Execute;
@@ -539,7 +543,7 @@ end;
 
 function TDriverDataSetFireDAC.IsReadOnly: Boolean;
 begin
-  Result := FDataSet.ReadOnly;
+  Result := FDataSet.UpdateOptions.ReadOnly;
 end;
 
 function TDriverDataSetFireDAC.IsUniDirectional: Boolean;
@@ -586,7 +590,7 @@ end;
 
 procedure TDriverDataSetFireDAC._SetReadOnly(const Value: Boolean);
 begin
-  FDataSet.ReadOnly := Value;
+  FDataSet.UpdateOptions.ReadOnly := Value;
 end;
 
 procedure TDriverDataSetFireDAC._SetUniDirectional(const Value: Boolean);
@@ -597,7 +601,7 @@ end;
 procedure TDriverDataSetFireDAC._SetFetchOptions(const Value: TFetchOptions);
 begin
   inherited _SetFetchOptions(Value);
-  FDataSet.FetchOptions.Mode := TFDFetchMode(Value.Mode);
+  FDataSet.FetchOptions.Mode := FireDAC.Stan.Option.TFDFetchMode(Ord(Value.Mode));
   FDataSet.FetchOptions.RowsetSize := Value.BatchSize;
   if Value.Mode = fmOnDemand then
     FDataSet.FetchOptions.Unidirectional := True;

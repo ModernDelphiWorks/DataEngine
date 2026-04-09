@@ -8,7 +8,7 @@ uses
   Data.DB,
 
   ZConnection,
-  DBE.DataEngine.FactoryInterfaces;
+  DataEngine.FactoryInterfaces;
 
 type
   [TestFixture]
@@ -56,7 +56,7 @@ type
 implementation
 
 uses
-  dbe.factory.zeos,
+  DataEngine.FactoryZeos,
   Tests.DataEngine.Consts;
 
 { TTestDriverConnection }

@@ -38,7 +38,8 @@ type
     procedure StartTransaction(const ALevel: TDBIsolationLevel = ilDefault); override;
     procedure Commit; override;
     procedure Rollback; override;
-    function InTransaction: Boolean; override;
+  protected
+    function _InTransaction: Boolean; override;
   end;
 
 implementation
@@ -127,11 +128,9 @@ begin
   {$ENDIF}
 end;
 
-function TDriverZeosTransaction.InTransaction: Boolean;
+function TDriverZeosTransaction._InTransaction: Boolean;
 begin
   {$IFDEF ZEOS80UP}
-  if not Assigned(FTransactionActive) then
-    raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
   Result := (FTransactionActive as TZTransaction).InTransaction;
   {$ELSE}
   Result := FConnection.InTransaction;

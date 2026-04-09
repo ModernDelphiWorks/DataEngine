@@ -46,6 +46,7 @@ type
     function IsConnected: Boolean; virtual;
     function CreateQuery: IDBQuery; virtual;
     function CreateDataSet(const ASQL: String = ''): IDBDataSet; virtual;
+    function BulkLoader: IDBBulkLoader; virtual;
     function GetSQLScripts: String; virtual;
     function RowsAffected: UInt32; virtual;
     function GetDriver: TDBEngineDriver; virtual;
@@ -125,6 +126,11 @@ end;
 function TFactoryConnection.CreateDataSet(const ASQL: String): IDBDataSet;
 begin
   Result := FDriverConnection.CreateDataSet(ASQL);
+end;
+
+function TFactoryConnection.BulkLoader: IDBBulkLoader;
+begin
+  Result := FDriverConnection.BulkLoader;
 end;
 
 procedure TFactoryConnection.Disconnect;

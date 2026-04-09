@@ -34,7 +34,7 @@ type
     procedure StartTransaction(const ALevel: TDBIsolationLevel = ilDefault); override;
     procedure Commit; override;
     procedure Rollback; override;
-    function InTransaction: Boolean; override;
+    function _InTransaction: Boolean; override;
   end;
 
 implementation
@@ -76,11 +76,8 @@ begin
   inherited;
 end;
 
-function TDriverSQLdbTransaction.InTransaction: Boolean;
+function TDriverSQLdbTransaction._InTransaction: Boolean;
 begin
-  if not Assigned(FTransactionActive) then
-    raise Exception.Create('The active transaction is not defined. Please make sure to start a transaction before checking if it is in progress.');
-    
   Result := (FTransactionActive as TSQLTransaction).Active;
 end;
 

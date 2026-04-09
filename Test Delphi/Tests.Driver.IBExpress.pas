@@ -9,7 +9,7 @@ uses
 
   IBDatabase,
 
-  DBE.DataEngine.FactoryInterfaces;
+  DataEngine.FactoryInterfaces;
 
 type
   [TestFixture]
@@ -57,7 +57,7 @@ type
 implementation
 
 uses
-  dbe.factory.ibexpress,
+  DataEngine.FactoryIBExpress,
   Tests.DataEngine.Consts;
 
 { TTestDriverConnection }

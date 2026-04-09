@@ -14,7 +14,7 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
   Tests.Driver.FireDAC in 'Tests.Driver.FireDAC.pas',
-  Tests.DataEngine.Consts in 'Tests.Consts.pas',
+  Tests.DataEngine.Consts in 'Tests.DataEngine.Consts.pas',
   DataEngine.DriverFireDac in '..\Source\Drivers\DataEngine.DriverFireDac.pas',
   DataEngine.DriverFireDacTransaction in '..\Source\Drivers\DataEngine.DriverFireDacTransaction.pas',
   DataEngine.FactoryFireDac in '..\Source\Drivers\DataEngine.FactoryFireDac.pas',

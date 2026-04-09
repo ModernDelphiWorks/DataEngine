@@ -8,6 +8,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Fixed
 - **Driver Robustness**: Standardized `IDBConnection` internal interfaces across legacy drivers and resolved namespace collisions in test fixtures (Issue #35).
+- **Implicit Transactions**: Finalized support for implicit 'DEFAULT' transaction activation in `TFactoryConnection`, ensuring compatibility for lazy-initialization drivers.
+- **Test Alignment**: Updated DBExpress and FireDAC test projects and modernized test constant naming conventions.
 
 ## [0.17.2] - 2026-04-09
 ### Fixed

@@ -38,7 +38,8 @@ type
     procedure StartTransaction(const ALevel: TDBIsolationLevel = ilDefault); override;
     procedure Commit; override;
     procedure Rollback; override;
-    function InTransaction: Boolean; override;
+  protected
+    function _InTransaction: Boolean; override;
   end;
 
 implementation
@@ -104,9 +105,9 @@ begin
   (FTransactionActive as TFDTransaction).Rollback;
 end;
 
-function TDriverFireDACTransaction.InTransaction: Boolean;
+function TDriverFireDACTransaction._InTransaction: Boolean;
 begin
-  Result := Assigned(FTransactionActive) and (FTransactionActive as TFDTransaction).Active;
+  Result := (FTransactionActive as TFDTransaction).Active;
 end;
 
 end.

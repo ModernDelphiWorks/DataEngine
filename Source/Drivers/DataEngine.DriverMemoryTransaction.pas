@@ -34,7 +34,7 @@ type
     procedure StartTransaction(const ALevel: TDBIsolationLevel = ilDefault); override;
     procedure Commit; override;
     procedure Rollback; override;
-    function InTransaction: Boolean; override;
+    function _InTransaction: Boolean; override;
   end;
 
 implementation
@@ -74,7 +74,7 @@ begin
   FConnection.Rollback;
 end;
 
-function TDriverMemoryTransaction.InTransaction: Boolean;
+function TDriverMemoryTransaction._InTransaction: Boolean;
 begin
   Result := FConnection.InTransaction;
 end;

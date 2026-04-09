@@ -44,7 +44,8 @@ type
     procedure StartTransaction(const ALevel: TDBIsolationLevel = ilDefault); override;
     procedure Commit; override;
     procedure Rollback; override;
-    function InTransaction: Boolean; override;
+  protected
+    function _InTransaction: Boolean; override;
   end;
 
 implementation
@@ -140,9 +141,9 @@ begin
   end;
 end;
 
-function TDriverDBExpressTransaction.InTransaction: Boolean;
+function TDriverDBExpressTransaction._InTransaction: Boolean;
 begin
-  Result := Assigned(FTransactionActive) and FConnection.InTransaction;
+  Result := FConnection.InTransaction;
 end;
 
 end.

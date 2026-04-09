@@ -34,7 +34,8 @@ type
     procedure StartTransaction(const ALevel: TDBIsolationLevel = ilDefault); override;
     procedure Commit; override;
     procedure Rollback; override;
-    function InTransaction: Boolean; override;
+  protected
+    function _InTransaction: Boolean; override;
   end;
 
 implementation
@@ -96,9 +97,9 @@ begin
   (FTransactionActive as TUniTransaction).Rollback;
 end;
 
-function TDriverUniDACTransaction.InTransaction: Boolean;
+function TDriverUniDACTransaction._InTransaction: Boolean;
 begin
-  Result := Assigned(FTransactionActive) and (FTransactionActive as TUniTransaction).Active;
+  Result := (FTransactionActive as TUniTransaction).Active;
 end;
 
 end.

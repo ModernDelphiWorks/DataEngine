@@ -102,6 +102,7 @@ type
     FMonitorCallback: TMonitorProc;
     FLock: TCriticalSection;
     function _GetTransaction(const AKey: String): TComponent; virtual;
+    function _InTransaction: Boolean; virtual;
   public
     constructor Create(const AConnection: TComponent; const AMonitorCallback: TMonitorProc = nil); virtual;
     destructor Destroy; override;
@@ -2494,6 +2495,16 @@ begin
 end;
 
 function TDriverTransaction.InTransaction: Boolean;
+begin
+  FLock.Enter;
+  try
+    Result := Assigned(FTransactionActive) and _InTransaction;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TDriverTransaction._InTransaction: Boolean;
 begin
   Result := False;
 end;

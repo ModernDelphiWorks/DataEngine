@@ -40,8 +40,7 @@ implementation
 
 uses
   DataEngine.DataSetSnapshot,
-  Datasnap.DBClient,
-  Datasnap.Provider,
+  DataEngine.InMemoryDataFactory,
   MidasLib,
   System.RegularExpressions;
 
@@ -68,44 +67,32 @@ end;
 
 class function TCacheManager.CreateSnapshot(const ASource: IDBDataSet): IDBDataSetSnapshot;
 var
-  LClientDataSet: TClientDataSet;
-  LProvider: TDataSetProvider;
+  LData: TDataSet;
 begin
   if not Assigned(ASource) then
     Exit(nil);
 
-  LClientDataSet := TClientDataSet.Create(nil);
-  LProvider := TDataSetProvider.Create(nil);
-  try
-    LProvider.DataSet := ASource.AsDataSet;
-    LClientDataSet.Data := LProvider.Data;
-    Result := TDataSetSnapshot.Create(LClientDataSet);
-  finally
-    LProvider.Free;
-  end;
+  LData := TInMemoryDataFactory.CreateFromDataSet(ASource.AsDataSet);
+  Result := TDataSetSnapshot.Create(LData);
 end;
 
 class procedure TCacheManager.SerializeToStream(const ASnapshot: IDBDataSetSnapshot; AStream: TStream);
-var
-  LDataSet: TDataSet;
 begin
   if not Assigned(ASnapshot) then Exit;
-  LDataSet := ASnapshot.AsDataSet;
-  if LDataSet is TClientDataSet then
-    TClientDataSet(LDataSet).SaveToStream(AStream);
+  TInMemoryDataFactory.SaveToStream(ASnapshot.AsDataSet, AStream);
 end;
 
 class function TCacheManager.DeserializeFromStream(AStream: TStream): IDBDataSetSnapshot;
 var
-  LClientDataSet: TClientDataSet;
+  LData: TDataSet;
 begin
-  LClientDataSet := TClientDataSet.Create(nil);
+  LData := TInMemoryDataFactory.CreateDataSet(nil);
   try
     AStream.Position := 0;
-    LClientDataSet.LoadFromStream(AStream);
-    Result := TDataSetSnapshot.Create(LClientDataSet);
+    TInMemoryDataFactory.LoadFromStream(LData, AStream);
+    Result := TDataSetSnapshot.Create(LData);
   except
-    LClientDataSet.Free;
+    LData.Free;
     Result := nil;
   end;
 end;

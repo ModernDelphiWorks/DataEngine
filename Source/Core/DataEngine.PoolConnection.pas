@@ -51,6 +51,22 @@ type
     property Timeout: Integer read FTimeout;
   end;
 
+  TPoolManager = class(TInterfacedObject, IDBPoolManager)
+  private
+    FPools: TObjectDictionary<string, TPoolConnection>;
+    FLock: TCriticalSection;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    function AcquireConnection(const ATenantID: string; const AFactory: TFunc<IDBConnection>;
+      const AMaxConnections: Integer = 10; const ALifetime: Integer = 600): IDBConnection;
+    procedure ReleaseConnection(const ATenantID: string; const AConnection: IDBConnection);
+    procedure Clear;
+    procedure Cleanup;
+  end;
+
+function PoolManager: IDBPoolManager;
+
 implementation
 
 constructor TPoolConnection.Create(const AMaxConnections: Integer; const AConnectionLifetime: Integer;
@@ -183,6 +199,101 @@ begin
     FLock.Release;
   end;
 end;
+
+var
+  vPoolManager: IDBPoolManager;
+  vPoolManagerLock: TCriticalSection;
+
+function PoolManager: IDBPoolManager;
+begin
+  if not Assigned(vPoolManager) then
+  begin
+    vPoolManagerLock.Acquire;
+    try
+      if not Assigned(vPoolManager) then
+        vPoolManager := TPoolManager.Create;
+    finally
+      vPoolManagerLock.Release;
+    end;
+  end;
+  Result := vPoolManager;
+end;
+
+{ TPoolManager }
+
+constructor TPoolManager.Create;
+begin
+  FPools := TObjectDictionary<string, TPoolConnection>.Create([doOwnsValues]);
+  FLock := TCriticalSection.Create;
+end;
+
+destructor TPoolManager.Destroy;
+begin
+  FLock.Free;
+  FPools.Free;
+  inherited;
+end;
+
+function TPoolManager.AcquireConnection(const ATenantID: string; const AFactory: TFunc<IDBConnection>;
+  const AMaxConnections: Integer; const ALifetime: Integer): IDBConnection;
+var
+  LPool: TPoolConnection;
+begin
+  FLock.Acquire;
+  try
+    if not FPools.TryGetValue(ATenantID, LPool) then
+    begin
+      LPool := TPoolConnection.Create(AMaxConnections, ALifetime, AFactory);
+      FPools.Add(ATenantID, LPool);
+    end;
+  finally
+    FLock.Release;
+  end;
+  Result := LPool.AcquireConnection;
+end;
+
+procedure TPoolManager.ReleaseConnection(const ATenantID: string; const AConnection: IDBConnection);
+var
+  LPool: TPoolConnection;
+begin
+  FLock.Acquire;
+  try
+    if FPools.TryGetValue(ATenantID, LPool) then
+      LPool.ReleaseConnection(AConnection);
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TPoolManager.Clear;
+begin
+  FLock.Acquire;
+  try
+    FPools.Clear;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TPoolManager.Cleanup;
+var
+  LPool: TPoolConnection;
+begin
+  FLock.Acquire;
+  try
+    for LPool in FPools.Values do
+      LPool.CleanupExpiredConnections;
+  finally
+    FLock.Release;
+  end;
+end;
+
+initialization
+  vPoolManagerLock := TCriticalSection.Create;
+
+finalization
+  vPoolManager := nil;
+  vPoolManagerLock.Free;
 
 end.
 

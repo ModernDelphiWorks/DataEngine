@@ -2,7 +2,7 @@
 
 Este documento delineia a evolução passada e os objetivos futuros do projeto **DataEngine**.
 
-**Última atualização:** 2026-04-10 (Conclusão do Desacoplamento do Core - v1.0.0-Ready)
+**Última atualização:** 2026-04-10 (Conclusão do Multi-tenant Pooling - v1.0.0-Ready)
 
 ## Concluído (Histórico de Sprints)
 
@@ -37,6 +37,7 @@ Este documento delineia a evolução passada e os objetivos futuros do projeto *
 - [x] **SPRINT-16: Advanced Observability** — Métricas de performance de query, estruturação do MonitorCallback para telemetria e detecção de slow queries. (v0.16.0)
 - [x] **SPRINT-17: Technical Debt & Stabilization** — Resolução de regressões de transação (Issue #35 e #43), refinamento de observers e padronização. (v0.17.x)
 - [x] **SPRINT-18: Core Decoupling & Finalization** — Desacoplamento total do Core de engines específicos (FireDAC), substituição por `TClientDataSet` no Cache e Snapshot, e uso de driver SQLite nativo para persistência local. Este é o marco final do projeto **DataEngine**. (v1.0.0-Ready)
+- [x] **SPRINT-19: Multi-tenant Connection Pooling** — Implementação de gestão de múltiplos pools para suporte a SaaS e Microserviços.
 
 
 

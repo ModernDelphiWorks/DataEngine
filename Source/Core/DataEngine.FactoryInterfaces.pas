@@ -391,6 +391,15 @@ type
     procedure SetSlowQueryThreshold(const AValue: Integer);
   end;
 
+  IDBPoolManager = interface
+    ['{79B25F68-91E0-469A-B8ED-0FE6AF4A2031}']
+    function AcquireConnection(const ATenantID: string; const AFactory: TFunc<IDBConnection>;
+      const AMaxConnections: Integer = 10; const ALifetime: Integer = 600): IDBConnection;
+    procedure ReleaseConnection(const ATenantID: string; const AConnection: IDBConnection);
+    procedure Clear;
+    procedure Cleanup;
+  end;
+
 const
   TStrDBEngineDriver: array[TDBEngineDriver.dnMSSQL..TDBEngineDriver.dnMemory] of
                  string = ('MSSQL','MySQL','Firebird','SQLite','Interbase',

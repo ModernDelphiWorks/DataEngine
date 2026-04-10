@@ -20,7 +20,6 @@ uses
   Classes,
   SysUtils,
   Variants,
-  Datasnap.DBClient,
   DataEngine.FactoryInterfaces;
 
 type
@@ -180,6 +179,9 @@ type
 
 implementation
 
+uses
+  DataEngine.InMemoryDataFactory;
+
 { TDataSetSnapshot }
 
 constructor TDataSetSnapshot.Create(const AInternal: TDataSet; const AIsOwner: Boolean);
@@ -275,18 +277,10 @@ function TDataSetSnapshot.AggFields: TFields; begin Result := FData.AggFields; e
 
 function TDataSetSnapshot.CreateView: IDBDataSet;
 var
-  LNewData: TClientDataSet;
+  LNewData: TDataSet;
 begin
-  if FData is TClientDataSet then
-  begin
-    LNewData := TClientDataSet.Create(nil);
-    LNewData.Data := TClientDataSet(FData).Data;
-    Result := TDataSetSnapshot.Create(LNewData, True);
-  end
-  else
-  begin
-    Result := Self;
-  end;
+  LNewData := TInMemoryDataFactory.CloneDataSet(FData);
+  Result := TDataSetSnapshot.Create(LNewData, True);
 end;
 
 function TDataSetSnapshot._GetActive: Boolean; begin Result := FData.Active; end;

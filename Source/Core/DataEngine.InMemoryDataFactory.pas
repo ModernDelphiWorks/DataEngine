@@ -40,20 +40,16 @@ end;
 
 class function TInMemoryDataFactory.CloneDataSet(ASource: TDataSet): TDataSet;
 var
-  LSourceCDS, LTargetCDS: TClientDataSet;
+  LStream: TMemoryStream;
 begin
   Result := CreateDataSet(nil);
-  if (ASource is TClientDataSet) and (Result is TClientDataSet) then
-  begin
-    LSourceCDS := TClientDataSet(ASource);
-    LTargetCDS := TClientDataSet(Result);
-    LTargetCDS.Data := LSourceCDS.Data;
-  end
-  else
-  begin
-    // Fallback or Exception if not supported
-    Result.Free;
-    raise Exception.Create('CloneDataSet: Motor de memória incompatível ou não suportado para clonagem direta.');
+  LStream := TMemoryStream.Create;
+  try
+    SaveToStream(ASource, LStream);
+    LStream.Position := 0;
+    LoadFromStream(Result, LStream);
+  finally
+    LStream.Free;
   end;
 end;
 

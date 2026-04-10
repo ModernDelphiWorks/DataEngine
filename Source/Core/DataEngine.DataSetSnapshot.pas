@@ -20,7 +20,7 @@ uses
   Classes,
   SysUtils,
   Variants,
-  FireDAC.Comp.Client,
+  Datasnap.DBClient,
   DataEngine.FactoryInterfaces;
 
 type
@@ -275,20 +275,17 @@ function TDataSetSnapshot.AggFields: TFields; begin Result := FData.AggFields; e
 
 function TDataSetSnapshot.CreateView: IDBDataSet;
 var
-  LNewData: TDataSet;
+  LNewData: TClientDataSet;
 begin
-  // For FireDAC snapshots (prototype), we share the data property
-  if FData is TFDMemTable then
+  if FData is TClientDataSet then
   begin
-    LNewData := TFDMemTable.Create(nil);
-    TFDMemTable(LNewData).Data := TFDMemTable(FData).Data;
-    Result := TDataSetSnapshot.Create(LNewData, True); // View owns its own table, but shares data
+    LNewData := TClientDataSet.Create(nil);
+    LNewData.Data := TClientDataSet(FData).Data;
+    Result := TDataSetSnapshot.Create(LNewData, True);
   end
   else
   begin
-    // Fallback: This part needs a more generic cloning for other drivers
-    // For the study/prototype sprint, we assume FireDAC/MemTable data
-    Result := Self; // If not clonable, return self (vulnerable to the bug)
+    Result := Self;
   end;
 end;
 

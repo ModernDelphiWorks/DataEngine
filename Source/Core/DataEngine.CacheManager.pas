@@ -40,16 +40,10 @@ implementation
 
 uses
   DataEngine.DataSetSnapshot,
-  FireDAC.Comp.Client,
-  FireDAC.Stan.Intf,
-  FireDAC.Stan.Option,
-  FireDAC.Stan.Error,
-  FireDAC.DatS,
-  FireDAC.Phys.Intf,
-  FireDAC.DApt.Intf,
-  FireDAC.Comp.DataSet,
-  FireDAC.Stan.StorageBin,
-  System.RegularExpressions; // Required for sfBinary serialization
+  Datasnap.DBClient,
+  Datasnap.Provider,
+  MidasLib,
+  System.RegularExpressions;
 
 { TCacheManager }
 
@@ -74,18 +68,20 @@ end;
 
 class function TCacheManager.CreateSnapshot(const ASource: IDBDataSet): IDBDataSetSnapshot;
 var
-  LMemTable: TFDMemTable;
+  LClientDataSet: TClientDataSet;
+  LProvider: TDataSetProvider;
 begin
   if not Assigned(ASource) then
     Exit(nil);
 
-  LMemTable := TFDMemTable.Create(nil);
+  LClientDataSet := TClientDataSet.Create(nil);
+  LProvider := TDataSetProvider.Create(nil);
   try
-    LMemTable.Data := TFDDataSet(ASource.AsDataSet).Data;
-    Result := TDataSetSnapshot.Create(LMemTable);
-  except
-    LMemTable.Free;
-    raise;
+    LProvider.DataSet := ASource.AsDataSet;
+    LClientDataSet.Data := LProvider.Data;
+    Result := TDataSetSnapshot.Create(LClientDataSet);
+  finally
+    LProvider.Free;
   end;
 end;
 
@@ -95,21 +91,21 @@ var
 begin
   if not Assigned(ASnapshot) then Exit;
   LDataSet := ASnapshot.AsDataSet;
-  if LDataSet is TFDMemTable then
-    TFDMemTable(LDataSet).SaveToStream(AStream, sfBinary);
+  if LDataSet is TClientDataSet then
+    TClientDataSet(LDataSet).SaveToStream(AStream);
 end;
 
 class function TCacheManager.DeserializeFromStream(AStream: TStream): IDBDataSetSnapshot;
 var
-  LMemTable: TFDMemTable;
+  LClientDataSet: TClientDataSet;
 begin
-  LMemTable := TFDMemTable.Create(nil);
+  LClientDataSet := TClientDataSet.Create(nil);
   try
     AStream.Position := 0;
-    LMemTable.LoadFromStream(AStream, sfBinary);
-    Result := TDataSetSnapshot.Create(LMemTable);
+    LClientDataSet.LoadFromStream(AStream);
+    Result := TDataSetSnapshot.Create(LClientDataSet);
   except
-    LMemTable.Free;
+    LClientDataSet.Free;
     Result := nil;
   end;
 end;

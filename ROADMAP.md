@@ -2,7 +2,7 @@
 
 Este documento delineia a evolução passada e os objetivos futuros do projeto **DataEngine**.
 
-**Última atualização:** 2026-04-10 (Conclusão do Multi-tenant Pooling - v1.0.0-Ready)
+**Última atualização:** 2026-04-10 (v1.0.0 Global Release - Stabilization & Pooling Completed)
 
 ## Concluído (Histórico de Sprints)
 
@@ -35,9 +35,22 @@ Este documento delineia a evolução passada e os objetivos futuros do projeto *
 - [x] **SPRINT-14: Native Driver Streaming** — Implementação de fetching incremental nativo nos principais drivers. (v0.14.0)
 - [x] **SPRINT-15: Connection Resiliency & Health Checks** — Implementação de Retry Policy e verificações de integridade de conexão (Ping-Alive). (v0.15.0)
 - [x] **SPRINT-16: Advanced Observability** — Métricas de performance de query, estruturação do MonitorCallback para telemetria e detecção de slow queries. (v0.16.0)
-- [x] **SPRINT-17: Technical Debt & Stabilization** — Resolução de regressões de transação (Issue #35 e #43), refinamento de observers e padronização. (v0.17.x)
-- [x] **SPRINT-18: Core Decoupling & Finalization** — Desacoplamento total do Core de engines específicos (FireDAC), substituição por `TClientDataSet` no Cache e Snapshot, e uso de driver SQLite nativo para persistência local. Este é o marco final do projeto **DataEngine**. (v1.0.0-Ready)
-- [x] **SPRINT-19: Multi-tenant Connection Pooling** — Implementação de gestão de múltiplos pools para suporte a SaaS e Microserviços.
+- [x] **SPRINT-18: Core Decoupling & Finalization** — Desacoplamento total do Core de engines específicos (FireDAC), substituição por `TClientDataSet` no Cache e Snapshot. (v1.0.0-Ready) — delivered v1.0.0 2026-04-10
+- [x] **SPRINT-19: Multi-tenant Connection Pooling** — Implementação de gestão de múltiplos pools para suporte a SaaS e Microserviços. — delivered v1.0.0 2026-04-10
+- [x] **v1.0.0 Stabilization** — Final manual and refactoring. — delivered v1.0.0 2026-04-10
+
+---
+
+## Próximas Fases (Evolução Contínua)
+
+### Phase 2 — Schema Migrations & Web Empowerment
+**Goal:** Prove uma camada de evolução de esquema agnóstica e integração nativa com middlewares web.
+**Target:** Q3 2026
+
+- [x] **SPRINT-20: Schema Migrations (Foundation)** — Interface `IDBMigration` e orquestrador de versões.
+- [x] **SPRINT-21: FluentSQL Integration** — Bridge para tradução agnóstica de DDL.
+- [ ] **SPRINT-22: Horse Middleware** — Adaptadores automáticos para transações HTTP.
+- [ ] **SPRINT-23: Redis Distributed Pooling** — Pool coordenado para larga escala.
 
 
 

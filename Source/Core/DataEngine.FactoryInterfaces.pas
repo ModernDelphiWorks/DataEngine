@@ -76,6 +76,9 @@ type
     function ValueDef(const Def: Variant): Variant;
   end;
 
+  IDBDataSet = interface;
+  IDBResultSet = IDBDataSet;
+
   IDBDataSet = interface
     ['{AB044ADD-9E30-4ADA-92CF-DD75EC096981}']
     function _GetFilter: String;

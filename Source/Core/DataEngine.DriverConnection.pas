@@ -134,6 +134,8 @@ type
     FMetadataCache: IDBMetadataCache;
     FFetchOptions: TFetchOptions;
     FSlowQueryThreshold: Integer;
+    FParams: TParams;
+  protected
     procedure _Notify(const AEventType: TMonitorEventType; const ACommand: string;
       AParams: TParams; const AExecutionTime: Int64 = 0; const AFetchTime: Int64 = 0;
       const ARowsAffected: UInt32 = 0; const AException: Exception = nil); virtual;
@@ -157,9 +159,11 @@ type
       const AMonitorCallback: TMonitorProc; const ADriver: TDBEngineDriver;
       const ACache: IDBCacheProvider = nil; const AMetadataCache: IDBMetadataCache = nil;
       const ASlowQueryThreshold: Integer = DEFAULT_SLOW_QUERY_THRESHOLD); virtual;
+    destructor Destroy; override;
     procedure ExecuteDirect; virtual;
     function ExecuteQuery: IDBDataSet; virtual;
     function RowsAffected: UInt32; virtual;
+    property Params: TParams read _GetParams;
     procedure Prepare; virtual;
     procedure Unprepare; virtual;
     function ParamByName(const AValue: string): TParam; virtual;
@@ -1912,6 +1916,12 @@ begin
   FSlowQueryThreshold := ASlowQueryThreshold;
 end;
 
+destructor TDriverQuery.Destroy;
+begin
+  FreeAndNil(FParams);
+  inherited;
+end;
+
 procedure TDriverQuery._Notify(const AEventType: TMonitorEventType; const ACommand: string;
   AParams: TParams; const AExecutionTime: Int64; const AFetchTime: Int64;
   const ARowsAffected: UInt32; const AException: Exception);
@@ -2021,7 +2031,9 @@ end;
 
 function TDriverQuery.ParamByName(const AValue: string): TParam;
 begin
-  Result := nil;
+  Result := Params.FindParam(AValue);
+  if not Assigned(Result) then
+    Result := Params.CreateParam(ftUnknown, AValue, ptInput);
 end;
 
 function TDriverQuery._GetCommandText: String;
@@ -2035,7 +2047,9 @@ end;
 
 function TDriverQuery._GetParams: TParams;
 begin
-  Result := nil;
+  if not Assigned(FParams) then
+    FParams := TParams.Create(nil);
+  Result := FParams;
 end;
 
 procedure TDriverQuery._SetMonitorLog(const ASQL, ATransactionName: String; const AParams: TParams);

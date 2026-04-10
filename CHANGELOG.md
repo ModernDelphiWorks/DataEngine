@@ -6,6 +6,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added
+- **Core Decoupling**: Replaced all FireDAC dependencies in `CacheManager`, `SQLiteCacheProvider`, and `DataSetSnapshot` with engine-agnostic components (`TClientDataSet`) and the native SQLite3 driver, achieving a 100% decoupling of the Core from specific frameworks (Issue #45).
+- **Snapshot Serialization**: Migrated from FireDAC binary format to universal Midas binary format for cache snapshots, ensuring compatibility across all data drivers.
+- **Unified Local Cache**: Refactored `TSQLiteCacheProvider` to use the embedded Native SQLite3 driver instead of FireDAC providers, reducing the final binary footprint and external dependencies.
+
 ### Fixed
 - **Driver Robustness**: Standardized `IDBConnection` internal interfaces across legacy drivers and resolved namespace collisions in test fixtures (Issue #35).
 - **Implicit Transactions**: Finalized support for implicit 'DEFAULT' transaction activation in `TFactoryConnection`, ensuring compatibility for lazy-initialization drivers.

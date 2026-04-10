@@ -2,7 +2,7 @@
 
 Este documento delineia a evolução passada e os objetivos futuros do projeto **DataEngine**.
 
-**Última atualização:** 2026-04-09 (Correção de regressão Issue #35)
+**Última atualização:** 2026-04-10 (v1.0.0 Global Release - Stabilization & Pooling Completed)
 
 ## Concluído (Histórico de Sprints)
 
@@ -35,7 +35,22 @@ Este documento delineia a evolução passada e os objetivos futuros do projeto *
 - [x] **SPRINT-14: Native Driver Streaming** — Implementação de fetching incremental nativo nos principais drivers. (v0.14.0)
 - [x] **SPRINT-15: Connection Resiliency & Health Checks** — Implementação de Retry Policy e verificações de integridade de conexão (Ping-Alive). (v0.15.0)
 - [x] **SPRINT-16: Advanced Observability** — Métricas de performance de query, estruturação do MonitorCallback para telemetria e detecção de slow queries. (v0.16.0)
-- [ ] **SPRINT-17: Technical Debt & Stabilization** — Resolução de regressões de transação (Issue #35), refinamento de observers e padronização de drivers legados. (v0.17.x)
+- [x] **SPRINT-18: Core Decoupling & Finalization** — Desacoplamento total do Core de engines específicos (FireDAC), substituição por `TClientDataSet` no Cache e Snapshot. (v1.0.0-Ready) — delivered v1.0.0 2026-04-10
+- [x] **SPRINT-19: Multi-tenant Connection Pooling** — Implementação de gestão de múltiplos pools para suporte a SaaS e Microserviços. — delivered v1.0.0 2026-04-10
+- [x] **v1.0.0 Stabilization** — Final manual and refactoring. — delivered v1.0.0 2026-04-10
+
+---
+
+## Próximas Fases (Evolução Contínua)
+
+### Phase 2 — Schema Migrations & Web Empowerment
+**Goal:** Prove uma camada de evolução de esquema agnóstica e integração nativa com middlewares web.
+**Target:** Q3 2026
+
+- [x] **SPRINT-20: Schema Migrations (Foundation)** — Interface `IDBMigration` e orquestrador de versões.
+- [x] **SPRINT-21: FluentSQL Integration** — Bridge para tradução agnóstica de DDL.
+- [ ] **SPRINT-22: Horse Middleware** — Adaptadores automáticos para transações HTTP.
+- [ ] **SPRINT-23: Redis Distributed Pooling** — Pool coordenado para larga escala.
 
 
 
@@ -43,20 +58,30 @@ Este documento delineia a evolução passada e os objetivos futuros do projeto *
 - Tornar o DataEngine o framework de conectividade padrão para o ecossistema Delphi moderno, com foco em performance e abstração total de banco de dados.
 
 
-## FUTURO A ANALISAR
+## Banco de Ideias & Estudos Futuros
 
+Este tópico serve como um "backlog de inovação" para o DataEngine. Aqui são registradas ideias, tendências e arquiteturas que podem ser exploradas em sprints futuras após a estabilização da V1.0.
 
-## Sobre o SPRINT-18 (Multi-tenant Connection Pooling)
-A vantagem real: Em sistemas Desktop, cada usuário tem sua própria conexão aberta na sua máquina. O custo é baixo. Mas em APIs e microsserviços (ex: Horse/DataSnap), se chegarem 500 requisições num segundo, criar 500 conexões novas de banco ao mesmo tempo derruba qualquer SGBD por excesso de Handshake / Autenticação TCP. O Pooling faz o DataEngine manter, por exemplo, 20 conexões permanentemente abertas na memória do servidor da sua API. Quando chegam 500 usuários pedindo dados, as requisições "pegam emprestadas" as conexões livres durante alguns milissegundos e devolvem.
+### 1. Multi-tenant Connection Pooling (Estudo Base SPRINT-18)
+*   **Conceito:** Implementar um pool de conexões agnóstico e de alta performance dentro do framework.
+*   **Vantagem:** Essencial para APIs e Microsserviços (Horse, DataSnap). Evita o "exhaustion" do SGBD ao manter conexões persistentes e reutilizáveis, reduzindo o custo de handshake/autenticação TCP.
+*   **Prioridade:** Alta para cenários Web/Server.
 
-Resumo: Aumenta absurdamente a performance para a web/API e evita queda do banco (exhaustion). Porém, se você usa as ferramentas que dão suporte de pooling dos próprios drivers underlying, ele perde a prioridade. Se o FireDAC usar o dele, por exemplo. Mas se você quiser um agnóstico, seria SPRINT-18.
+### 2. Schema Migrations & Fluent Integration
+*   **Conceito:** Integrar o motor do DataEngine com o FluentSQL para fornecer uma camada de migração de banco de dados transparente.
+*   **Vantagem:** Permitir versionamento de banco de dados agnóstico, onde a estrutura é definida em código e aplicada via `ExecuteAsync` com `Retry Policy`.
 
-## Sobre o SPRINT-20 (Schema Migrations)
-Sua visão é corretíssima. O FluentSQL cuida da "tradução", dizendo a estrutura das tabelas. O DataEngine entra com o poder bruto, executando o ExecuteAsync agnóstico com Retry Policy na base. Seria perfeito integrá-los e ter uma rotina transparente que rode tudo lendo do DB.
+### 3. Framework Adapters & Eco-System Publishing
+*   **Conceito:** Criar pontes nativas para outros frameworks populares.
+    *   **Boss Publishing:** Empacotamento formal para instalação via `boss install`.
+    *   **Horse Middlewares:** Adaptadores automáticos para gerenciar transações baseadas no ciclo de vida da requisição HTTP (Auto-Commit no Status 200, Auto-Rollback no Status 500).
 
-## Sobre o SPRINT-21 (Framework Adapters & Publish)
-Isso é puramente para "disponibilização". Duas coisas que ajudam a tornar o ecossistema um padrão usado por outros:
+### 4. Native Driver Streaming & Incremental Fetching
+*   **Conceito:** Aprofundar o suporte a streaming de dados para grandes volumes, garantindo que o `FetchOptions` seja respeitado nativamente por todos os drivers (FireDAC, UniDAC, Zeos).
 
-Boss Publishing: Basicamente empacotar o DataEngine para instalar via Boss (o gerenciador de pacotes moderno do Delphi). O cara digita boss install DataEngine lá e já puxa da dependência correta.
+### 5. Distributed Cache Providers (Redis/Memcached)
+*   **Conceito:** Expandir a interface `IDBCacheProvider` para suportar backends distribuídos, permitindo que instâncias diferentes de uma API compartilhem o mesmo cache de resultados.
 
-Adapters (Middlewares): Se alguém vai criar uma API com Horse, a gente criaria um pacote que liga o DataEngine no Horse em 1 linha. Algo que abra uma transação no recebimento de um request web e faça "Commit" assim que for respondida com Status 200, ou "Rollback" se o Horse estourar um erro 500. É o que chamamos de Middleware de Transação.
+---
+## Visões e Insights Adicionais
+*Qualquer nova proposta de arquitetura ou melhoria deve ser documentada aqui para avaliação de impacto antes de ser convertida em uma Sprint oficial.*

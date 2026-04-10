@@ -20,7 +20,6 @@ uses
   Classes,
   SysUtils,
   Variants,
-  FireDAC.Comp.Client,
   DataEngine.FactoryInterfaces;
 
 type
@@ -180,6 +179,9 @@ type
 
 implementation
 
+uses
+  DataEngine.InMemoryDataFactory;
+
 { TDataSetSnapshot }
 
 constructor TDataSetSnapshot.Create(const AInternal: TDataSet; const AIsOwner: Boolean);
@@ -277,19 +279,8 @@ function TDataSetSnapshot.CreateView: IDBDataSet;
 var
   LNewData: TDataSet;
 begin
-  // For FireDAC snapshots (prototype), we share the data property
-  if FData is TFDMemTable then
-  begin
-    LNewData := TFDMemTable.Create(nil);
-    TFDMemTable(LNewData).Data := TFDMemTable(FData).Data;
-    Result := TDataSetSnapshot.Create(LNewData, True); // View owns its own table, but shares data
-  end
-  else
-  begin
-    // Fallback: This part needs a more generic cloning for other drivers
-    // For the study/prototype sprint, we assume FireDAC/MemTable data
-    Result := Self; // If not clonable, return self (vulnerable to the bug)
-  end;
+  LNewData := TInMemoryDataFactory.CloneDataSet(FData);
+  Result := TDataSetSnapshot.Create(LNewData, True);
 end;
 
 function TDataSetSnapshot._GetActive: Boolean; begin Result := FData.Active; end;

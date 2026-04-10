@@ -21,21 +21,12 @@ uses
   DB,
   DataEngine.FactoryInterfaces,
   DataEngine.CacheTypes,
-  FireDAC.Comp.Client,
-  FireDAC.Stan.Intf,
-  FireDAC.Stan.Option,
-  FireDAC.Stan.Error,
-  FireDAC.Phys.Intf,
-  FireDAC.Phys.SQLite,
-  FireDAC.Phys.SQLiteDef,
-  FireDAC.Stan.Def,
-  FireDAC.Stan.Async,
-  FireDAC.DApt;
+  SQLiteTable3;
 
 type
   TSQLiteCacheProvider = class(TInterfacedObject, IDBCacheProvider, IDBMetadataCache)
   private
-    FConn: TFDConnection;
+    FDB: TSQLiteDatabase;
     FHitCount: Integer;
     FMissCount: Integer;
     FDatabasePath: string;
@@ -72,11 +63,7 @@ constructor TSQLiteCacheProvider.Create(const ADatabasePath: string);
 begin
   inherited Create;
   FDatabasePath := ADatabasePath;
-  FConn := TFDConnection.Create(nil);
-  FConn.DriverName := 'SQLite';
-  FConn.Params.Database := ADatabasePath;
-  FConn.LoginPrompt := False;
-  FConn.Connected := True;
+  FDB := TSQLiteDatabase.Create(ADatabasePath);
   
   FHitCount := 0;
   FMissCount := 0;
@@ -86,13 +73,13 @@ end;
 
 destructor TSQLiteCacheProvider.Destroy;
 begin
-  FConn.Free;
+  FDB.Free;
   inherited;
 end;
 
 procedure TSQLiteCacheProvider._EnsureTable;
 begin
-  FConn.ExecSQL(
+  FDB.ExecSQL(
     'CREATE TABLE IF NOT EXISTS CacheStore (' +
     '  Key TEXT PRIMARY KEY,' +
     '  MetaData TEXT,' +
@@ -100,21 +87,21 @@ begin
     '  ExpireAt DATETIME' +
     ')'
   );
-  FConn.ExecSQL('CREATE INDEX IF NOT EXISTS IDX_CacheStore_ExpireAt ON CacheStore(ExpireAt)');
+  FDB.ExecSQL('CREATE INDEX IF NOT EXISTS IDX_CacheStore_ExpireAt ON CacheStore(ExpireAt)');
   
-  FConn.ExecSQL(
+  FDB.ExecSQL(
     'CREATE TABLE IF NOT EXISTS CacheTableMapping (' +
     '  Key TEXT,' +
     '  TableName TEXT' +
     ')'
   );
-  FConn.ExecSQL('CREATE INDEX IF NOT EXISTS IDX_CacheTableMapping_TableName ON CacheTableMapping(TableName)');
+  FDB.ExecSQL('CREATE INDEX IF NOT EXISTS IDX_CacheTableMapping_TableName ON CacheTableMapping(TableName)');
 end;
 
 procedure TSQLiteCacheProvider.SetValue(const AKey: string; const ADataSet: IDBDataSetSnapshot; const ATTL: Integer; const ATables: TArray<string>);
 var
   LStream: TMemoryStream;
-  LQuery: TFDQuery;
+  LStmt: ISQLitePreparedStatement;
   LExpireAt: TDateTime;
   LTTL: Integer;
   LTable: string;
@@ -126,57 +113,50 @@ begin
   LExpireAt := Now + (LTTL / (24 * 60)); 
 
   LStream := TMemoryStream.Create;
-  LQuery := TFDQuery.Create(nil);
   try
-    LQuery.Connection := FConn;
     if Assigned(ADataSet) then
     begin
       TCacheManager.SerializeToStream(ADataSet, LStream);
       LStream.Position := 0;
     end;
     
-    LQuery.SQL.Text := 'INSERT OR REPLACE INTO CacheStore (Key, Data, ExpireAt) VALUES (:Key, :Data, :ExpireAt)';
-    LQuery.ParamByName('Key').AsString := AKey;
-    LQuery.ParamByName('Data').LoadFromStream(LStream, ftBlob);
-    LQuery.ParamByName('ExpireAt').AsDateTime := LExpireAt;
-    LQuery.ExecSQL;
+    LStmt := FDB.GetPreparedStatementIntf('INSERT OR REPLACE INTO CacheStore (Key, Data, ExpireAt) VALUES (:Key, :Data, :ExpireAt)');
+    LStmt.SetParamText(':Key', AKey);
+    if LStream.Size > 0 then
+      LStmt.SetParamBlob(':Data', LStream)
+    else
+      LStmt.SetParamNull(':Data');
+    LStmt.SetParamDateTime(':ExpireAt', LExpireAt);
+    LStmt.ExecSQL;
     
     if Length(ATables) > 0 then
     begin
-       LQuery.SQL.Text := 'DELETE FROM CacheTableMapping WHERE Key = :Key';
-       LQuery.ParamByName('Key').AsString := AKey;
-       LQuery.ExecSQL;
+       FDB.ExecSQL('DELETE FROM CacheTableMapping WHERE Key = ' + QuotedStr(AKey));
        
-       LQuery.SQL.Text := 'INSERT INTO CacheTableMapping (Key, TableName) VALUES (:Key, :TableName)';
+       LStmt := FDB.GetPreparedStatementIntf('INSERT INTO CacheTableMapping (Key, TableName) VALUES (:Key, :TableName)');
        for LTable in ATables do
        begin
-         LQuery.ParamByName('Key').AsString := AKey;
-         LQuery.ParamByName('TableName').AsString := LTable;
-         LQuery.ExecSQL;
+         LStmt.SetParamText(':Key', AKey);
+         LStmt.SetParamText(':TableName', LTable);
+         LStmt.ExecSQL;
        end;
     end;
   finally
-    LQuery.Free;
     LStream.Free;
   end;
 end;
 
 function TSQLiteCacheProvider.GetValue(const AKey: string): IDBDataSetSnapshot;
 var
-  LQuery: TFDQuery;
-  LStream: TStream;
+  LTable: TSQLiteTable;
+  LStream: TMemoryStream;
 begin
-  LQuery := TFDQuery.Create(nil);
+  LTable := FDB.GetTable('SELECT Data FROM CacheStore WHERE Key = ' + QuotedStr(AKey) + 
+    ' AND (ExpireAt IS NULL OR ExpireAt > ' + FloatToStr(Now) + ')');
   try
-    LQuery.Connection := FConn;
-    LQuery.SQL.Text := 'SELECT Data FROM CacheStore WHERE Key = :Key AND (ExpireAt IS NULL OR ExpireAt > :Now)';
-    LQuery.ParamByName('Key').AsString := AKey;
-    LQuery.ParamByName('Now').AsDateTime := Now;
-    LQuery.Open;
-    
-    if not LQuery.Eof then
+    if not LTable.EOF then
     begin
-      LStream := LQuery.CreateBlobStream(LQuery.FieldByName('Data'), bmRead);
+      LStream := LTable.FieldAsBlob(LTable.FieldIndex['Data']);
       try
         Result := TCacheManager.DeserializeFromStream(LStream);
         if Assigned(Result) then
@@ -193,53 +173,46 @@ begin
       Result := nil;
     end;
   finally
-    LQuery.Free;
+    LTable.Free;
   end;
 end;
 
 procedure TSQLiteCacheProvider.Clear;
 begin
-  FConn.ExecSQL('DELETE FROM CacheTableMapping');
-  FConn.ExecSQL('DELETE FROM CacheStore');
+  FDB.ExecSQL('DELETE FROM CacheTableMapping');
+  FDB.ExecSQL('DELETE FROM CacheStore');
   FHitCount := 0;
   FMissCount := 0;
 end;
 
 procedure TSQLiteCacheProvider.Evict(const AKey: string);
 begin
-  FConn.ExecSQL('DELETE FROM CacheTableMapping WHERE Key = :Key', [AKey]);
-  FConn.ExecSQL('DELETE FROM CacheStore WHERE Key = :Key', [AKey]);
+  FDB.ExecSQL('DELETE FROM CacheTableMapping WHERE Key = ' + QuotedStr(AKey));
+  FDB.ExecSQL('DELETE FROM CacheStore WHERE Key = ' + QuotedStr(AKey));
 end;
 
 procedure TSQLiteCacheProvider.InvalidateByTable(const ATableName: string);
 var
-  LKeys: TStringList;
-  LIndex: Integer;
+  LTable: TSQLiteTable;
 begin
-  LKeys := TStringList.Create;
+  LTable := FDB.GetTable('SELECT DISTINCT Key FROM CacheTableMapping WHERE TableName = ' + QuotedStr(ATableName));
   try
-    // Get all keys mapping to this table
-    FConn.ExecSQL('SELECT DISTINCT Key FROM CacheTableMapping WHERE TableName = :TableName', [ATableName],
-      procedure(ADataSet: TDataSet)
-      begin
-        LKeys.Add(ADataSet.Fields[0].AsString);
-      end
-    );
+    while not LTable.EOF do
+    begin
+      Evict(LTable.Fields[0]);
+      LTable.Next;
+    end;
     
-    // Invalidate each key
-    for LIndex := 0 to LKeys.Count - 1 do
-      Evict(LKeys[LIndex]);
-      
     // Clear mapping for this table
-    FConn.ExecSQL('DELETE FROM CacheTableMapping WHERE TableName = :TableName', [ATableName]);
+    FDB.ExecSQL('DELETE FROM CacheTableMapping WHERE TableName = ' + QuotedStr(ATableName));
   finally
-    LKeys.Free;
+    LTable.Free;
   end;
 end;
 
 function TSQLiteCacheProvider.Count: Integer;
 begin
-  Result := FConn.ExecSQLScalar('SELECT COUNT(*) FROM CacheStore');
+  Result := FDB.GetTableValue('SELECT COUNT(*) FROM CacheStore');
 end;
 
 function TSQLiteCacheProvider.HitCount: Integer;
@@ -254,12 +227,12 @@ end;
 
 procedure TSQLiteCacheProvider.Prune;
 begin
-  FConn.ExecSQL('DELETE FROM CacheStore WHERE ExpireAt < :Now', [Now]);
+  FDB.ExecSQL('DELETE FROM CacheStore WHERE ExpireAt < ' + FloatToStr(Now));
 end;
 
 procedure TSQLiteCacheProvider.SetMetadata(const AKey: string; const AJSON: string; const ATTL: Integer);
 var
-  LQuery: TFDQuery;
+  LStmt: ISQLitePreparedStatement;
   LExpireAt: TDateTime;
   LTTL: Integer;
 begin
@@ -269,41 +242,30 @@ begin
 
   LExpireAt := Now + (LTTL / (24 * 60));
 
-  LQuery := TFDQuery.Create(nil);
-  try
-    LQuery.Connection := FConn;
-    LQuery.SQL.Text := 'INSERT OR REPLACE INTO CacheStore (Key, MetaData, ExpireAt) VALUES (:Key, :MetaData, :ExpireAt)';
-    LQuery.ParamByName('Key').AsString := 'META:' + AKey;
-    LQuery.ParamByName('MetaData').AsString := AJSON;
-    LQuery.ParamByName('ExpireAt').AsDateTime := LExpireAt;
-    LQuery.ExecSQL;
-  finally
-    LQuery.Free;
-  end;
+  LStmt := FDB.GetPreparedStatementIntf('INSERT OR REPLACE INTO CacheStore (Key, MetaData, ExpireAt) VALUES (:Key, :MetaData, :ExpireAt)');
+  LStmt.SetParamText(':Key', 'META:' + AKey);
+  LStmt.SetParamText(':MetaData', AJSON);
+  LStmt.SetParamDateTime(':ExpireAt', LExpireAt);
+  LStmt.ExecSQL;
 end;
 
 function TSQLiteCacheProvider.GetMetadata(const AKey: string): string;
 var
-  LQuery: TFDQuery;
+  LTable: TSQLiteTable;
 begin
   Result := string.Empty;
-  LQuery := TFDQuery.Create(nil);
+  LTable := FDB.GetTable('SELECT MetaData FROM CacheStore WHERE Key = ' + QuotedStr('META:' + AKey) + 
+    ' AND (ExpireAt IS NULL OR ExpireAt > ' + FloatToStr(Now) + ')');
   try
-    LQuery.Connection := FConn;
-    LQuery.SQL.Text := 'SELECT MetaData FROM CacheStore WHERE Key = :Key AND (ExpireAt IS NULL OR ExpireAt > :Now)';
-    LQuery.ParamByName('Key').AsString := 'META:' + AKey;
-    LQuery.ParamByName('Now').AsDateTime := Now;
-    LQuery.Open;
-    
-    if not LQuery.Eof then
+    if not LTable.EOF then
     begin
-      Result := LQuery.FieldByName('MetaData').AsString;
+      Result := LTable.FieldValByNameAsString['MetaData'];
       Inc(FHitCount);
     end
     else
       Inc(FMissCount);
   finally
-    LQuery.Free;
+    LTable.Free;
   end;
 end;
 

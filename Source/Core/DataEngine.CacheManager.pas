@@ -40,16 +40,9 @@ implementation
 
 uses
   DataEngine.DataSetSnapshot,
-  FireDAC.Comp.Client,
-  FireDAC.Stan.Intf,
-  FireDAC.Stan.Option,
-  FireDAC.Stan.Error,
-  FireDAC.DatS,
-  FireDAC.Phys.Intf,
-  FireDAC.DApt.Intf,
-  FireDAC.Comp.DataSet,
-  FireDAC.Stan.StorageBin,
-  System.RegularExpressions; // Required for sfBinary serialization
+  DataEngine.InMemoryDataFactory,
+  MidasLib,
+  System.RegularExpressions;
 
 { TCacheManager }
 
@@ -74,42 +67,32 @@ end;
 
 class function TCacheManager.CreateSnapshot(const ASource: IDBDataSet): IDBDataSetSnapshot;
 var
-  LMemTable: TFDMemTable;
+  LData: TDataSet;
 begin
   if not Assigned(ASource) then
     Exit(nil);
 
-  LMemTable := TFDMemTable.Create(nil);
-  try
-    LMemTable.Data := TFDDataSet(ASource.AsDataSet).Data;
-    Result := TDataSetSnapshot.Create(LMemTable);
-  except
-    LMemTable.Free;
-    raise;
-  end;
+  LData := TInMemoryDataFactory.CreateFromDataSet(ASource.AsDataSet);
+  Result := TDataSetSnapshot.Create(LData);
 end;
 
 class procedure TCacheManager.SerializeToStream(const ASnapshot: IDBDataSetSnapshot; AStream: TStream);
-var
-  LDataSet: TDataSet;
 begin
   if not Assigned(ASnapshot) then Exit;
-  LDataSet := ASnapshot.AsDataSet;
-  if LDataSet is TFDMemTable then
-    TFDMemTable(LDataSet).SaveToStream(AStream, sfBinary);
+  TInMemoryDataFactory.SaveToStream(ASnapshot.AsDataSet, AStream);
 end;
 
 class function TCacheManager.DeserializeFromStream(AStream: TStream): IDBDataSetSnapshot;
 var
-  LMemTable: TFDMemTable;
+  LData: TDataSet;
 begin
-  LMemTable := TFDMemTable.Create(nil);
+  LData := TInMemoryDataFactory.CreateDataSet(nil);
   try
     AStream.Position := 0;
-    LMemTable.LoadFromStream(AStream, sfBinary);
-    Result := TDataSetSnapshot.Create(LMemTable);
+    TInMemoryDataFactory.LoadFromStream(LData, AStream);
+    Result := TDataSetSnapshot.Create(LData);
   except
-    LMemTable.Free;
+    LData.Free;
     Result := nil;
   end;
 end;

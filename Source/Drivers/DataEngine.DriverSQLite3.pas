@@ -71,10 +71,10 @@ type
     function _GetParams: TParams; override;
     procedure Prepare; override;
     procedure Unprepare; override;
-    function ParamByName(const AValue: string): TParam; override;
+    procedure _ApplyParams(const ASQLiteStmt: ISQLitePreparedStatement);
   end;
 
-  TDriverDataSetSQLite3 = class(TDriverResultSetBase)
+  TDriverDataSetSQLite3 = class(TDriverDataSetBase)
   private
     procedure CreateFieldDefs;
   protected
@@ -91,14 +91,20 @@ type
       const ACachedFieldDefs: TFieldDefs = nil);
     destructor Destroy; override;
     procedure Close; override;
-    function NotEof: Boolean; override;
+    function NotEof: Boolean; virtual;
     function RecordCount: UInt32; override;
     function FieldDefs: TFieldDefs; override;
-    function GetFieldValue(const AFieldName: String): Variant; overload; override;
-    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload; override;
-    function GetFieldType(const AFieldName: String): TFieldType; override;
-    function GetField(const AFieldName: String): TField; override;
+    function _GetFieldValue(const AFieldName: String): Variant; override;
+    function GetFieldValue(const AFieldIndex: UInt16): Variant; overload;
+    function GetFieldType(const AFieldName: String): TFieldType; virtual;
+    function GetField(const AFieldName: String): TField; virtual;
     function RowsAffected: UInt32; override;
+    function Eof: Boolean; override;
+    procedure Next; override;
+    procedure First; override;
+    function FieldByName(const AFieldName: String): TField; override;
+    function FindField(const AFieldName: string): TField; override;
+    function Fields: TFields; override;
   end;
 
 implementation
@@ -247,6 +253,7 @@ end;
 
 procedure TDriverQuerySQLite3._InternalExecuteDirect;
 begin
+  _ApplyParams(FSQLQuery);
   FSQLQuery.ExecSQL;
 end;
 
@@ -267,6 +274,7 @@ begin
         if FDriverTransaction.TransactionActive = nil then
           raise Exception.Create('Transaction not assigned.');
           
+        _ApplyParams(LStatement);
         LResultSet := LStatement.ExecQueryIntf;
         _SetMonitorLog(FSQLQuery.SQL, '', nil);
       except
@@ -299,15 +307,13 @@ end;
 
 function TDriverQuerySQLite3._GetParams: TParams;
 begin
-  Result := TParams.Create;
-  // SQLitePreparedStatement doesn't easily expose params as TParams in this wrapper
-  // But we can implement a basic creator if needed or keep as empty if not supported.
+  Result := inherited _GetParams;
 end;
 
 procedure TDriverQuerySQLite3.Prepare;
 begin
   if FSQLQuery.SQL <> '' then
-    FSQLQuery.PrepareStatement(FSQLQuery.SQL);
+    FSQLQuery.PrepareStatement;
 end;
 
 procedure TDriverQuerySQLite3.Unprepare;
@@ -315,11 +321,17 @@ begin
   // SQLiteNative wrapper may not have explicit unprepare
 end;
 
-function TDriverQuerySQLite3.ParamByName(const AValue: string): TParam;
+procedure TDriverQuerySQLite3._ApplyParams(const ASQLiteStmt: ISQLitePreparedStatement);
+var
+  LFor: Integer;
+  LParam: TParam;
 begin
-  // Native wrapper uses specific SetParam methods, so TParam might not be directly applicable
-  // Returning nil or raising error if not usable via interface
-  Result := nil;
+  if not Assigned(Params) then Exit;
+  for LFor := 0 to Params.Count - 1 do
+  begin
+    LParam := Params[LFor];
+    ASQLiteStmt.SetParamVariant(LParam.Name, LParam.Value);
+  end;
 end;
 
 { TDriverDataSetSQLite3 }
@@ -331,7 +343,8 @@ var
   LField: TField;
   LFor: Integer;
 begin
-  inherited Create(AMonitorCallback);
+  inherited Create;
+  FMonitorCallback := AMonitorCallback;
   FConnection := AConnection;
   FDataSet := ADataSet;
   FFieldDefs := TFieldDefs.Create(nil);
@@ -360,6 +373,16 @@ begin
   end;
   
   FDataSetInternal.CreateDataSet;
+  
+  while not FDataSet.EOF do
+  begin
+    FDataSetInternal.Append;
+    for LFor := 0 to FDataSet.FieldCount - 1 do
+      FDataSetInternal.Fields[LFor].Value := FDataSet.FieldsVal[LFor];
+    FDataSetInternal.Post;
+    FDataSet.Next;
+  end;
+  FDataSetInternal.First;
 end;
 
 destructor TDriverDataSetSQLite3.Destroy;
@@ -381,7 +404,7 @@ begin
   Result := FFieldDefs;
 end;
 
-function TDriverDataSetSQLite3.GetFieldValue(const AFieldName: String): Variant;
+function TDriverDataSetSQLite3._GetFieldValue(const AFieldName: String): Variant;
 begin
   Result := FDataSet.FieldByName[AFieldName].Value;
 end;
@@ -405,10 +428,10 @@ end;
 function TDriverDataSetSQLite3.GetFieldValue(const AFieldIndex: UInt16): Variant;
 begin
   if Cardinal(AFieldIndex) > Cardinal(FDataSet.FieldCount - 1) then
-    Exit(Variants.Null);
+    Exit(Null);
 
   if FDataSet.Fields[AFieldIndex].IsNull then
-    Result := Variants.Null
+    Result := Null
   else
     Result := FDataSet.Fields[AFieldIndex].Value;
 end;
@@ -420,6 +443,36 @@ begin
   else
     FDataSet.Next;
   Result := not FDataSet.Eof;
+end;
+
+function TDriverDataSetSQLite3.Eof: Boolean;
+begin
+  Result := FDataSetInternal.Eof;
+end;
+
+procedure TDriverDataSetSQLite3.Next;
+begin
+  FDataSetInternal.Next;
+end;
+
+procedure TDriverDataSetSQLite3.First;
+begin
+  FDataSetInternal.First;
+end;
+
+function TDriverDataSetSQLite3.FieldByName(const AFieldName: String): TField;
+begin
+  Result := FDataSetInternal.FieldByName(AFieldName);
+end;
+
+function TDriverDataSetSQLite3.FindField(const AFieldName: string): TField;
+begin
+  Result := FDataSetInternal.FindField(AFieldName);
+end;
+
+function TDriverDataSetSQLite3.Fields: TFields;
+begin
+  Result := FDataSetInternal.Fields;
 end;
 
 function TDriverDataSetSQLite3.RecordCount: UInt32;
@@ -436,15 +489,20 @@ end;
 procedure TDriverDataSetSQLite3.CreateFieldDefs;
 var
   LFor: Integer;
+  LField: TSQLiteField;
+  LType: TFieldType;
 begin
   FFieldDefs.Clear;
   for LFor := 0 to FDataSet.FieldCount - 1 do
   begin
-    with FFieldDefs.AddFieldDef do
-    begin
-      Name := FDataSet.Fields[LFor].Name;
-      DataType := TFieldType(FDataSet.Fields[LFor].FieldType);
+    LField := FDataSet.Fields[LFor];
+    case LField.FieldType of
+      1: LType := ftLargeint; // dtInt
+      2: LType := ftFloat;    // dtNumeric
+      15, 16: LType := ftDateTime; // dtDate, dtDateTime
+      else LType := ftString;
     end;
+    FFieldDefs.Add(LField.Name, LType, 255);
   end;
 end;
 

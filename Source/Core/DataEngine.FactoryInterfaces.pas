@@ -76,6 +76,9 @@ type
     function ValueDef(const Def: Variant): Variant;
   end;
 
+  IDBDataSet = interface;
+  IDBResultSet = IDBDataSet;
+
   IDBDataSet = interface
     ['{AB044ADD-9E30-4ADA-92CF-DD75EC096981}']
     function _GetFilter: String;
@@ -389,6 +392,15 @@ type
     procedure RemoveObserver(const AObserver: IDBObserver);
     function SlowQueryThreshold: Integer;
     procedure SetSlowQueryThreshold(const AValue: Integer);
+  end;
+
+  IDBPoolManager = interface
+    ['{79B25F68-91E0-469A-B8ED-0FE6AF4A2031}']
+    function AcquireConnection(const ATenantID: string; const AFactory: TFunc<IDBConnection>;
+      const AMaxConnections: Integer = 10; const ALifetime: Integer = 600): IDBConnection;
+    procedure ReleaseConnection(const ATenantID: string; const AConnection: IDBConnection);
+    procedure Clear;
+    procedure Cleanup;
   end;
 
 const

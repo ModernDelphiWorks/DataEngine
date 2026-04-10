@@ -6,8 +6,14 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-04-10
+
 ### Added
+- **v1.0.0 Stabilization**: Final architecture refactoring and structural stabilization for major release (Issue #48).
 - **Core Decoupling**: Replaced all FireDAC dependencies in `CacheManager`, `SQLiteCacheProvider`, and `DataSetSnapshot` with engine-agnostic components (`TClientDataSet`) and the native SQLite3 driver, achieving a 100% decoupling of the Core from specific frameworks (Issue #45).
+- **Horse Middleware**: Implemented `Horse.DataEngine.pas` integration for Horse web framework, providing automatic transaction lifecycle management and dependency injection of `IDBConnection` (Issue #50).
+- **Schema Migrations**: Implementation of an engine-agnostic schema migration framework with internal history tracking and FluentSQL bridge for DDL generation (Issue #49).
+- **Multi-tenant Pooling**: Enhanced connection pool with multi-tenant support, allowing dynamic selection of connection profiles via callbacks or request headers (Issue #47).
 - **Snapshot Serialization**: Migrated from FireDAC binary format to universal Midas binary format for cache snapshots, ensuring compatibility across all data drivers.
 - **Unified Local Cache**: Refactored `TSQLiteCacheProvider` to use the embedded Native SQLite3 driver instead of FireDAC providers, reducing the final binary footprint and external dependencies.
 
@@ -19,6 +25,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Changed
 - **Driver Architecture**: Refactored transaction state hooks (`_InTransaction`) for 17 database drivers, promoting centralized lifecycle management.
+
 
 ## [0.17.2] - 2026-04-09
 ### Fixed

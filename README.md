@@ -1,6 +1,6 @@
-# DBEBr Framework for Delphi/Lazaruz
+# DBEBr / DataEngine Framework for Delphi
 
-DATABASE ENGINE é um framework opensource que provê desacoplamento de conexão através de uma interface orientada a objeto, deixando seu sistema totalmente desacoplado de um único Engine de conexão, proporcionando de forma fácil e simples a troca para usar qualquer Engine disponível no mercado, seja ele FireDAC, DBExpress, Zeos entre outros. Fique livre de engine de conexão, sua aplicação só irá reconhecer o DBEBr.
+**DataEngine** is a high-performance, modular, and extensible database engine framework for Delphi. It provides a robust abstraction layer, allowing developers to build database-agnostic applications with ease.
 
 <p align="center">
   <a href="https://www.isaquepinheiro.com.br">
@@ -8,164 +8,116 @@ DATABASE ENGINE é um framework opensource que provê desacoplamento de conexão
   </a>
 </p>
 
-## 🏛 Delphi Versions
-Embarcadero Delphi XE e superior.
+## 🏛 Supported Platforms
+*   **Delphi XE or superior**
+*   **Lazarus / FreePascal** (Compatible Core)
 
-## ⚙️ Instalação
-Instalação usando o [`boss install`]
+## ⚙️ Installation
+Installation using [`boss install`]:
 ```sh
 boss install "https://github.com/HashLoad/dbebr"
 ```
 
-## ⚡️ Como usar
-```Delphi
-const
-  cSQLSELECT = 'SELECT CLIENT_NAME FROM CLIENT WHERE CLIENT_ID = %s';
-  cSQLUPDATE = 'UPDATE CLIENT SET CLIENT_NAME = %s WHERE CLIENT_ID = %s';
-  cSQLUPDATEPARAM = 'UPDATE CLIENT SET CLIENT_NAME = :CLIENT_NAME WHERE CLIENT_ID = :CLIENT_ID';
-  cDESCRIPTION = 'Description Randon=';
+---
 
-  ...
-  
-  TDriverConnection = class(TObject)
-  strict private
-    FConnection: TFDConnection;
-    FDBConnection: IDBConnection;
-    FDBQuery: IDBQuery;
-    FDBResultSet: IDBResultSet;
-    
-    ...
-    
-procedure TDriverConnection.Create;
+## 🚀 Key Features
+
+### 1. Database Independence
+Build your application once and run it on any engine. DataEngine abstracts engines like FireDAC, DBExpress, UniDac, Zeos, and more.
+- **Factory Pattern**: Inject specific engines (FireDAC, UniDAC, etc.) into a single `IDBConnection` interface.
+- **Agnostic Core**: Core features (Cache, Snapshot, Pool) are strictly independent of third-party components.
+
+### 2. Multi-tenant Connection Pooling
+Efficiently manage connection pools for SaaS and Microservices.
+- **Tenant Isolation**: Dedicated pools per tenant.
+- **Resource Management**: Configure max connections and reuse policies.
+
+### 3. Advanced Observability
+Real-time database monitoring with a built-in observer system.
+- **Execution Metrics**: Track high-precision execution times.
+- **Slow Query Tracking**: Automatically detect and log queries exceeding thresholds.
+- **Structured Events**: Support for `Start`, `End`, `Error`, and `Metric` events.
+
+### 4. Intelligent Caching
+Minimize database roundtrips with an engine-agnostic caching system.
+- **Local Persistence**: Integrated SQLite native driver for disk-based snapshots.
+- **Auto-Invalidation**: Heuristic detection of DML operations to clear relevant cache entries.
+
+---
+
+## ⚡️ Quick Start
+
+### Basic Connection (FireDAC Instance)
+```delphi
+procedure TMyDataModule.Setup;
 begin
-  FConnection := TFDConnection.Create(nil);
-  FConnection.Params.DriverID := 'SQLite';
-  FConnection.Params.Database := '.\database.db3';
-  FConnection.LoginPrompt := False;
-  FConnection.TxOptions.Isolation := xiReadCommitted;
-  FConnection.TxOptions.AutoCommit := False;
-
-  FDBConnection := TFactoryFireDAC.Create(FConnection, dnSQLite);
-end;
-```
-
-
-```Delphi
-procedure TDriverConnection.ExecuteDirect;
-var
-  LValue: String;
-  LRandon: String;
-begin
-  LRandon := IntToStr( Random(9999) );
-
-  FDBConnection.ExecuteDirect( Format(cSQLUPDATE, [QuotedStr(cDESCRIPTION + LRandon), '1']) );
-
-  FDBQuery := FDBConnection.CreateQuery;
-  FDBQuery.CommandText := Format(cSQLSELECT, ['1']);
-  LValue := FDBQuery.ExecuteQuery.FieldByName('CLIENT_NAME').AsString;
-end;
-```
-
-```Delphi
-procedure TDriverConnection.ExecuteDirectParams;
-var
-  LParams: TParams;
-  LRandon: String;
-  LValue: String;
-begin
-  LRandon := IntToStr( Random(9999) );
-
-  LParams := TParams.Create(nil);
-  try
-    with LParams.Add as TParam do
-    begin
-      Name := 'CLIENT_NAME';
-      DataType := ftString;
-      Value := cDESCRIPTION + LRandon;
-      ParamType := ptInput;
-    end;
-    with LParams.Add as TParam do
-    begin
-      Name := 'CLIENT_ID';
-      DataType := ftInteger;
-      Value := 1;
-      ParamType := ptInput;
-    end;
-    FDBConnection.ExecuteDirect(cSQLUPDATEPARAM, LParams);
-
-    FDBResultSet := FDBConnection.CreateResultSet(Format(cSQLSELECT, ['1']));
-    LValue := FDBResultSet.FieldByName('CLIENT_NAME').AsString;
-  finally
-    LParams.Free;
-  end;
-end;
-```
-
-```Delphi
-procedure TDriverConnection.Transaction;
-begin
+  // Standardize your connection to use DataEngine interfaces
+  FDBConnection := TFactoryFireDAC.Create(MyFDConnection, dnSQLite);
   FDBConnection.Connect;
-  try
-    FDBConnection.StartTransaction;
-    try
-      
-      // seu código aqui
-      
-      FDBConnection.Commit;
-    except
-      FDBConnection.Rollback;
-    end;
-  finally
-    FDBConnection.Disconnect;
-  end;  
 end;
 ```
 
-```Delphi
-procedure TDriverConnection.CreateQuery;
+### Simple Query Execution
+```delphi
+procedure TMyDataModule.UpdateUser;
 var
-  LValue: String;
-  LRandon: String;
+  LQuery: IDBQuery;
 begin
-  LRandon := IntToStr( Random(9999) );
-
-  FDBQuery := FDBConnection.CreateQuery;
-  FDBQuery.CommandText := Format(cSQLUPDATE, [QuotedStr(cDESCRIPTION + LRandon), '1']);
-  FDBQuery.ExecuteDirect;
-
-  FDBQuery.CommandText := Format(cSQLSELECT, ['1']);
-  LValue := FDBQuery.ExecuteQuery.FieldByName('CLIENT_NAME').AsString;
-end;
-```
-
-```Delphi
-procedure TDriverConnection.CreateResultSet;
-begin
-  FDBResultSet := FDBConnection.CreateResultSet(Format(cSQLSELECT, ['1']));
-  
-  while FDBResultSet.eof do
-  begin
-     // seu código aqui
+  LQuery := FDBConnection.CreateQuery;
+  try
+    LQuery.CommandText := 'UPDATE users SET active = 1 WHERE id = :id';
+    LQuery.ParamByName('id').AsInteger := 123;
+    LQuery.ExecuteDirect;
+  finally
+    // Interfaces handle cleanup automatically (ARC enabled)
   end;
 end;
 ```
 
-## ⛏️ Contribuição
+### Transaction Management
+```delphi
+FDBConnection.StartTransaction;
+try
+  // Your database operations here
+  FDBConnection.Commit;
+except
+  FDBConnection.Rollback;
+  raise;
+end;
+```
 
-Nossa equipe adoraria receber contribuições para este projeto open source. Se você tiver alguma ideia ou correção de bug, sinta-se à vontade para abrir uma issue ou enviar uma pull request.
+### Using Connection Pool (Multi-tenant)
+```delphi
+LConn := PoolManager.AcquireConnection(
+  'Tenant_A',
+  function: IDBConnection
+  begin
+    Result := TFactoryFireDAC.Create(CreateNativeConn, dnPostgreSQL);
+  end
+);
+try
+  // Use connection...
+finally
+  PoolManager.ReleaseConnection('Tenant_A', LConn);
+end;
+```
 
-[![Issues](https://img.shields.io/badge/Issues-channel-orange)](https://github.com/HashLoad/ormbr/issues)
+---
 
-Para enviar uma pull request, siga estas etapas:
+## ⛏️ Contributing
+We love contributions! Feel free to open issues or submit pull requests.
 
-1. Faça um fork do projeto
-2. Crie uma nova branch (`git checkout -b minha-nova-funcionalidade`)
-3. Faça suas alterações e commit (`git commit -am 'Adicionando nova funcionalidade'`)
-4. Faça push da branch (`git push origin minha-nova-funcionalidade`)
-5. Abra uma pull request
+1.  Fork the project.
+2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
+3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4.  Push to the branch (`git push origin feature/AmazingFeature`).
+5.  Open a Pull Request.
 
-## 📬 Contato
-[![Telegram](https://img.shields.io/badge/Telegram-channel-blue)](https://t.me/hashload)
+## 📬 Contact & Support
+- **Telegram**: [HashLoad Channel](https://t.me/hashload)
+- **Website**: [isaquepinheiro.com.br](https://www.isaquepinheiro.com.br)
 
-## 💲 Doação
+## 💲 Donation
 [![Doação](https://img.shields.io/badge/PagSeguro-contribua-green)](https://pag.ae/bglQrWD)
+---
+*Copyright © 2025-2026 Isaque Pinheiro. Licensed under Apache-2.0.*

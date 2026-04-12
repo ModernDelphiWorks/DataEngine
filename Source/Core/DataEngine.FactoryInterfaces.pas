@@ -394,6 +394,12 @@ type
     procedure SetSlowQueryThreshold(const AValue: Integer);
   end;
 
+  IDBPoolCoordinator = interface
+    ['{7AB25F68-91E0-469A-B8ED-0FE6AF4A2033}']
+    function AcquireSlot(const ATenantID: string; const AMaxSlots: Integer; const ATimeout: Integer; out ASlotToken: string): Boolean;
+    procedure ReleaseSlot(const ATenantID: string; const ASlotToken: string);
+  end;
+
   IDBPoolManager = interface
     ['{79B25F68-91E0-469A-B8ED-0FE6AF4A2031}']
     function AcquireConnection(const ATenantID: string; const AFactory: TFunc<IDBConnection>;
@@ -401,6 +407,8 @@ type
     procedure ReleaseConnection(const ATenantID: string; const AConnection: IDBConnection);
     procedure Clear;
     procedure Cleanup;
+    procedure SetCoordinator(const ACoordinator: IDBPoolCoordinator);
+    procedure SetDefaultTimeout(const ATimeout: Integer);
   end;
 
 const

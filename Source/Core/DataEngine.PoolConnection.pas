@@ -20,6 +20,7 @@ unit DataEngine.PoolConnection;
 interface
 
 uses
+  Classes,
   SysUtils,
   SyncObjs,
   DateUtils,
@@ -37,11 +38,16 @@ type
     FConnectionFactory: TFunc<IDBConnection>;
     FCreationTimes: TDictionary<IDBConnection, TDateTime>;
     FSlotTokens: TDictionary<IDBConnection, string>;
+    FLastRenewal: TDictionary<IDBConnection, TDateTime>;
     FTenantID: string;
     FCoordinator: IDBPoolCoordinator;
+    FMonitor: IDBPoolMonitor;
     FTimeout: Integer;
+    FMetrics: TPoolMetrics;
+    FHeartbeatThread: TThread;
     function _CreateNewConnection: IDBConnection;
     function _IsConnectionExpired(const AConnection: IDBConnection): Boolean;
+    procedure _CheckHeartbeat;
   public
     constructor Create(const ATenantID: string; const AMaxConnections: Integer; const AConnectionLifetime: Integer;
       const AConnectionFactory: TFunc<IDBConnection>; const ATimeout: Integer = 5000; const ACoordinator: IDBPoolCoordinator = nil);
@@ -49,17 +55,30 @@ type
     function AcquireConnection: IDBConnection;
     procedure ReleaseConnection(const AConnection: IDBConnection);
     procedure CleanupExpiredConnections;
+    function GetMetrics: TPoolMetrics;
+    procedure SetMonitor(const AMonitor: IDBPoolMonitor);
     property MaxConnections: Integer read FMaxConnections;
     property ConnectionLifeCycle: Integer read FConnectionLifeCycle;
     property Timeout: Integer read FTimeout;
     property TenantID: string read FTenantID;
     property Coordinator: IDBPoolCoordinator read FCoordinator write FCoordinator;
+    property Monitor: IDBPoolMonitor read FMonitor write FMonitor;
+  end;
+
+  TPoolHeartbeatThread = class(TThread)
+  private
+    FPool: TPoolConnection;
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(APool: TPoolConnection);
   end;
 
   TPoolManager = class(TInterfacedObject, IDBPoolManager)
   private
     FPools: TObjectDictionary<string, TPoolConnection>;
     FCoordinator: IDBPoolCoordinator;
+    FMonitor: IDBPoolMonitor;
     FLock: TCriticalSection;
     FDefaultTimeout: Integer;
   public
@@ -72,6 +91,8 @@ type
     procedure Cleanup;
     procedure SetCoordinator(const ACoordinator: IDBPoolCoordinator);
     procedure SetDefaultTimeout(const ATimeout: Integer);
+    procedure SetMonitor(const AMonitor: IDBPoolMonitor);
+    function GetMetrics(const ATenantID: string): TPoolMetrics;
   end;
 
 function PoolManager: IDBPoolManager;
@@ -92,6 +113,7 @@ begin
   FBusyConnections := TList<IDBConnection>.Create;
   FCreationTimes := TDictionary<IDBConnection, TDateTime>.Create;
   FSlotTokens := TDictionary<IDBConnection, string>.Create;
+  FLastRenewal := TDictionary<IDBConnection, TDateTime>.Create;
   FLock := TCriticalSection.Create;
   FTenantID := ATenantID;
   FMaxConnections := AMaxConnections;
@@ -99,19 +121,31 @@ begin
   FConnectionFactory := AConnectionFactory;
   FTimeout := ATimeout;
   FCoordinator := ACoordinator;
+
+  FillChar(FMetrics, SizeOf(FMetrics), 0);
+  FHeartbeatThread := TPoolHeartbeatThread.Create(Self);
 end;
 
 destructor TPoolConnection.Destroy;
 begin
+  if Assigned(FHeartbeatThread) then
+  begin
+    FHeartbeatThread.Terminate;
+    FHeartbeatThread.WaitFor;
+    FHeartbeatThread.Free;
+  end;
+
   FLock.Acquire;
   try
     FConnections.Clear;
     FBusyConnections.Clear;
     FCreationTimes.Clear;
+    FLastRenewal.Clear;
     FConnections.Free;
     FBusyConnections.Free;
     FCreationTimes.Free;
     FSlotTokens.Free;
+    FLastRenewal.Free;
   finally
     FLock.Release;
   end;
@@ -157,6 +191,7 @@ begin
         if _IsConnectionExpired(LCandidate) or (not LCandidate.IsAlive) then
         begin
           FCreationTimes.Remove(LCandidate);
+          FLastRenewal.Remove(LCandidate);
           LCandidate := _CreateNewConnection;
           LIsNew := True;
         end;
@@ -171,9 +206,13 @@ begin
       if Assigned(LCandidate) and (not Assigned(FCoordinator)) then
       begin
         FBusyConnections.Add(LCandidate);
+        FMetrics.PoolHits := FMetrics.PoolHits + 1;
         Result := LCandidate;
         Exit;
       end;
+
+      if not Assigned(LCandidate) then
+        FMetrics.PoolMisses := FMetrics.PoolMisses + 1;
     finally
       FLock.Release;
     end;
@@ -188,7 +227,11 @@ begin
           FLock.Acquire;
           try
             FSlotTokens.AddOrSetValue(LCandidate, LToken);
+            FLastRenewal.AddOrSetValue(LCandidate, Now);
             FBusyConnections.Add(LCandidate);
+            FMetrics.PoolHits := FMetrics.PoolHits + 1;
+            if Assigned(FMonitor) then
+              FMonitor.OnSlotAcquired(FTenantID, LToken);
             Result := LCandidate;
             Exit;
           finally
@@ -196,7 +239,12 @@ begin
           end;
         end;
       except
-        // On hard error, treat as failed acquisition to trigger retry/timeout
+        on E: Exception do
+        begin
+          FMetrics.CoordinatorErrors := FMetrics.CoordinatorErrors + 1;
+          if Assigned(FMonitor) then
+            FMonitor.OnRenewalFailed(FTenantID, '', E);
+        end;
       end;
 
       // Step 4: If we reach here, distributed acquisition failed.
@@ -251,7 +299,11 @@ begin
 
   // Release distributed slot outside the lock to avoid blocking other threads
   if LHasToken then
+  begin
     FCoordinator.ReleaseSlot(FTenantID, LToken);
+    if Assigned(FMonitor) then
+      FMonitor.OnSlotReleased(FTenantID, LToken);
+  end;
 end;
 
 procedure TPoolConnection.CleanupExpiredConnections;
@@ -268,10 +320,126 @@ begin
       begin
         FConnections.Delete(LFor);
         FCreationTimes.Remove(LConn);
+        FLastRenewal.Remove(LConn);
       end;
     end;
   finally
     FLock.Release;
+  end;
+end;
+
+function TPoolConnection.GetMetrics: TPoolMetrics;
+begin
+  FLock.Acquire;
+  try
+    Result := FMetrics;
+    Result.LocalBusyConnections := FBusyConnections.Count;
+    if Assigned(FCoordinator) then
+    begin
+      try
+        Result.DistributedSlotsBusy := FCoordinator.GetGlobalMetrics(FTenantID).DistributedSlotsBusy;
+      except
+        on E: Exception do
+        begin
+          FMetrics.CoordinatorErrors := FMetrics.CoordinatorErrors + 1;
+        end;
+      end;
+    end;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TPoolConnection.SetMonitor(const AMonitor: IDBPoolMonitor);
+begin
+  FLock.Acquire;
+  try
+    FMonitor := AMonitor;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TPoolConnection._CheckHeartbeat;
+var
+  LConn: IDBConnection;
+  LToken: string;
+  LNow: TDateTime;
+  LRenewalList: TDictionary<IDBConnection, string>;
+begin
+  if not Assigned(FCoordinator) then
+    Exit;
+
+  LRenewalList := TDictionary<IDBConnection, string>.Create;
+  try
+    FLock.Acquire;
+    try
+      LNow := Now;
+      for LConn in FBusyConnections do
+      begin
+        if FSlotTokens.TryGetValue(LConn, LToken) then
+        begin
+          // ADR-054: Renew if at 50% of TTL (approx 30s by default if TTL is 60s)
+          if SecondsBetween(LNow, FLastRenewal[LConn]) > 25 then 
+            LRenewalList.Add(LConn, LToken);
+        end;
+      end;
+    finally
+      FLock.Release;
+    end;
+
+    for LConn in LRenewalList.Keys do
+    begin
+      LToken := LRenewalList[LConn];
+      try
+        if FCoordinator.RefreshSlot(FTenantID, LToken) then
+        begin
+          FLock.Acquire;
+          try
+            FLastRenewal.AddOrSetValue(LConn, Now);
+          finally
+            FLock.Release;
+          end;
+        end
+        else
+        begin
+          if Assigned(FMonitor) then
+            FMonitor.OnRenewalFailed(FTenantID, LToken, Exception.Create('Coordinator failed to refresh slot'));
+        end;
+      except
+        on E: Exception do
+        begin
+          FMetrics.CoordinatorErrors := FMetrics.CoordinatorErrors + 1;
+          if Assigned(FMonitor) then
+            FMonitor.OnRenewalFailed(FTenantID, LToken, E);
+        end;
+      end;
+    end;
+  finally
+    LRenewalList.Free;
+  end;
+end;
+
+{ TPoolHeartbeatThread }
+
+constructor TPoolHeartbeatThread.Create(APool: TPoolConnection);
+begin
+  inherited Create(False);
+  FPool := APool;
+  FreeOnTerminate := False;
+end;
+
+procedure TPoolHeartbeatThread.Execute;
+begin
+  while not Terminated do
+  begin
+    try
+      FPool._CheckHeartbeat;
+    except
+      // Background threads must not leak exceptions
+    end;
+    // Sleep 5s between checks
+    Sleep(5000);
   end;
 end;
 
@@ -383,6 +551,35 @@ begin
   FLock.Acquire;
   try
     FDefaultTimeout := ATimeout;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TPoolManager.SetMonitor(const AMonitor: IDBPoolMonitor);
+var
+  LPool: TPoolConnection;
+begin
+  FLock.Acquire;
+  try
+    FMonitor := AMonitor;
+    for LPool in FPools.Values do
+      LPool.SetMonitor(FMonitor);
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TPoolManager.GetMetrics(const ATenantID: string): TPoolMetrics;
+var
+  LPool: TPoolConnection;
+begin
+  FLock.Acquire;
+  try
+    if FPools.TryGetValue(ATenantID, LPool) then
+      Result := LPool.GetMetrics
+    else
+      FillChar(Result, SizeOf(Result), 0);
   finally
     FLock.Release;
   end;

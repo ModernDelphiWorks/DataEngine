@@ -394,10 +394,27 @@ type
     procedure SetSlowQueryThreshold(const AValue: Integer);
   end;
 
+  TPoolMetrics = record
+    PoolHits: Int64;
+    PoolMisses: Int64;
+    LocalBusyConnections: Integer;
+    DistributedSlotsBusy: Integer;
+    CoordinatorErrors: Int64;
+  end;
+
+  IDBPoolMonitor = interface
+    ['{7BB25F68-91E0-469A-B8ED-0FE6AF4A2035}']
+    procedure OnSlotAcquired(const ATenantID: string; const ASlotToken: string);
+    procedure OnSlotReleased(const ATenantID: string; const ASlotToken: string);
+    procedure OnRenewalFailed(const ATenantID: string; const ASlotToken: string; const AException: Exception);
+  end;
+
   IDBPoolCoordinator = interface
     ['{7AB25F68-91E0-469A-B8ED-0FE6AF4A2033}']
     function AcquireSlot(const ATenantID: string; const AMaxSlots: Integer; const ATimeout: Integer; out ASlotToken: string): Boolean;
+    function RefreshSlot(const ATenantID: string; const ASlotToken: string): Boolean;
     procedure ReleaseSlot(const ATenantID: string; const ASlotToken: string);
+    function GetGlobalMetrics(const ATenantID: string): TPoolMetrics;
   end;
 
   IDBPoolManager = interface
@@ -409,6 +426,8 @@ type
     procedure Cleanup;
     procedure SetCoordinator(const ACoordinator: IDBPoolCoordinator);
     procedure SetDefaultTimeout(const ATimeout: Integer);
+    procedure SetMonitor(const AMonitor: IDBPoolMonitor);
+    function GetMetrics(const ATenantID: string): TPoolMetrics;
   end;
 
 const

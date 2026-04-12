@@ -29,17 +29,22 @@ type
   end;
 
   { TRedisPoolCoordinator: Distributed pooling coordinator using Redis ZSET strategy.
-    Reference: ADR-053 }
+    Reference: ADR-053, ADR-054 }
   TRedisPoolCoordinator = class(TInterfacedObject, IDBPoolCoordinator)
   private
     FRedis: IRedisClient;
     FNodeID: string;
     FTTL: Integer;
+    FMaxRetries: Integer;
     function GetNowUnix: string;
+    function ExecuteWithRetry(const AFunc: TFunc<string>): string;
   public
     constructor Create(const ARedis: IRedisClient; const ANodeID: string = ''; const ATTL: Integer = 60);
     function AcquireSlot(const ATenantID: string; const AMaxSlots: Integer; const ATimeout: Integer; out ASlotToken: string): Boolean;
+    function RefreshSlot(const ATenantID: string; const ASlotToken: string): Boolean;
     procedure ReleaseSlot(const ATenantID: string; const ASlotToken: string);
+    function GetGlobalMetrics(const ATenantID: string): TPoolMetrics;
+    property MaxRetries: Integer read FMaxRetries write FMaxRetries;
   end;
 
 implementation
@@ -57,11 +62,38 @@ begin
   if FNodeID = '' then
     FNodeID := TGuid.NewGuid.ToString.Replace('{', '').Replace('}', '');
   FTTL := ATTL;
+  FMaxRetries := 3;
 end;
 
 function TRedisPoolCoordinator.GetNowUnix: string;
 begin
   Result := IntToStr(DateTimeToUnix(Now));
+end;
+
+function TRedisPoolCoordinator.ExecuteWithRetry(const AFunc: TFunc<string>): string;
+var
+  LRetry: Integer;
+  LExc: Exception;
+begin
+  LExc := nil;
+  for LRetry := 0 to FMaxRetries do
+  begin
+    try
+      Result := AFunc();
+      Exit;
+    except
+      on E: Exception do
+      begin
+        LExc := E;
+        if LRetry < FMaxRetries then
+          Sleep(100 * (LRetry + 1))
+        else
+          raise;
+      end;
+    end;
+  end;
+  if Assigned(LExc) then
+    raise LExc;
 end;
 
 function TRedisPoolCoordinator.AcquireSlot(const ATenantID: string; const AMaxSlots: Integer; const ATimeout: Integer; out ASlotToken: string): Boolean;
@@ -87,28 +119,101 @@ const
 var
   LKey: string;
   LRes: string;
+  LToken: string;
 begin
   LKey := 'DataEngine:Pool:Slots:' + ATenantID;
-  ASlotToken := FNodeID + ':' + TGuid.NewGuid.ToString.Replace('{', '').Replace('}', '');
+  LToken := FNodeID + ':' + TGuid.NewGuid.ToString.Replace('{', '').Replace('}', '');
   
   try
-    LRes := FRedis.Eval(LScript, [LKey], [ASlotToken, GetNowUnix, IntToStr(FTTL), IntToStr(AMaxSlots)]);
+    LRes := ExecuteWithRetry(function: string
+      begin
+        Result := FRedis.Eval(LScript, [LKey], [LToken, GetNowUnix, IntToStr(FTTL), IntToStr(AMaxSlots)]);
+      end);
+    if LRes = 'OK' then
+    begin
+      ASlotToken := LToken;
+      Result := True;
+    end
+    else
+      Result := False;
+  except
+    Result := False; 
+  end;
+end;
+
+function TRedisPoolCoordinator.RefreshSlot(const ATenantID: string; const ASlotToken: string): Boolean;
+const
+  LScript = 
+    'local key = KEYS[1] ' +
+    'local member = ARGV[1] ' +
+    'local now = tonumber(ARGV[2]) ' +
+    'local ttl = tonumber(ARGV[3]) ' +
+    'redis.call("ZREMRANGEBYSCORE", key, "-inf", now - ttl) ' +
+    'if redis.call("ZSCORE", key, member) then ' +
+    '  redis.call("ZADD", key, now, member) ' +
+    '  return "OK" ' +
+    'else ' +
+    '  return "EXPIRED" ' +
+    'end';
+var
+  LRes: string;
+  LKey: string;
+  LToken: string;
+begin
+  LKey := 'DataEngine:Pool:Slots:' + ATenantID;
+  LToken := ASlotToken;
+  try
+    LRes := ExecuteWithRetry(function: string
+      begin
+        Result := FRedis.Eval(LScript, [LKey], [LToken, GetNowUnix, IntToStr(FTTL)]);
+      end);
     Result := LRes = 'OK';
   except
-    // Fallback: If Redis fails, we should decide whether to block or allow.
-    // Following "Graceful Degradation" rule, but TPoolConnection loop handles timeout.
-    Result := False; 
+    Result := False;
   end;
 end;
 
 procedure TRedisPoolCoordinator.ReleaseSlot(const ATenantID: string; const ASlotToken: string);
 const
   LScript = 'redis.call("ZREM", KEYS[1], ARGV[1]); return "OK"';
+var
+  LKey: string;
+  LToken: string;
 begin
+  LKey := 'DataEngine:Pool:Slots:' + ATenantID;
+  LToken := ASlotToken;
   try
-    FRedis.Eval(LScript, ['DataEngine:Pool:Slots:' + ATenantID], [ASlotToken]);
+    ExecuteWithRetry(function: string
+      begin
+        Result := FRedis.Eval(LScript, [LKey], [LToken]);
+      end);
   except
-    // Silent fail on release is acceptable for distributed pools due to TTL cleanup
+    // Silent fail on release is acceptable
+  end;
+end;
+
+function TRedisPoolCoordinator.GetGlobalMetrics(const ATenantID: string): TPoolMetrics;
+const
+  LScript = 
+    'local key = KEYS[1] ' +
+    'local now = tonumber(ARGV[1]) ' +
+    'local ttl = tonumber(ARGV[2]) ' +
+    'redis.call("ZREMRANGEBYSCORE", key, "-inf", now - ttl) ' +
+    'return tostring(redis.call("ZCARD", key))';
+var
+  LCountStr: string;
+  LKey: string;
+begin
+  LKey := 'DataEngine:Pool:Slots:' + ATenantID;
+  FillChar(Result, SizeOf(Result), 0);
+  try
+    LCountStr := ExecuteWithRetry(function: string
+      begin
+        Result := FRedis.Eval(LScript, [LKey], ['', GetNowUnix, IntToStr(FTTL)]);
+      end);
+    Result.DistributedSlotsBusy := StrToIntDef(LCountStr, 0);
+  except
+    // Return empty metrics on failure
   end;
 end;
 

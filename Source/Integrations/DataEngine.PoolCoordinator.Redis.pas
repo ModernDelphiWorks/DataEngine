@@ -26,24 +26,35 @@ type
   IRedisClient = interface
     ['{8AB25F68-91E0-469A-B8ED-0FE6AF4A2034}']
     function Eval(const AScript: string; const AKeys: array of string; const AArgs: array of string): string;
+    function Execute(const ACommand: string; const AArgs: array of string): TArray<string>;
+    procedure SetEndpoint(const AHost: string; const APort: Integer);
   end;
 
   { TRedisPoolCoordinator: Distributed pooling coordinator using Redis ZSET strategy.
-    Reference: ADR-053, ADR-054 }
+    Reference: ADR-053, ADR-054, ADR-014 }
   TRedisPoolCoordinator = class(TInterfacedObject, IDBPoolCoordinator)
   private
     FRedis: IRedisClient;
     FNodeID: string;
     FTTL: Integer;
     FMaxRetries: Integer;
+    FEndpoints: TStrings;
+    FServiceName: string;
+    FCurrentMasterHost: string;
+    FCurrentMasterPort: Integer;
     function GetNowUnix: string;
     function ExecuteWithRetry(const AFunc: TFunc<string>): string;
+    procedure _DiscoverMaster;
+    procedure _SetCurrentEndpoint(const AHost: string; const APort: Integer);
   public
     constructor Create(const ARedis: IRedisClient; const ANodeID: string = ''; const ATTL: Integer = 60);
+    constructor CreateSentinel(const ARedis: IRedisClient; const AServiceName: string; const AEndpoints: TStrings; const ANodeID: string = ''; const ATTL: Integer = 60);
+    destructor Destroy; override;
     function AcquireSlot(const ATenantID: string; const AMaxSlots: Integer; const ATimeout: Integer; out ASlotToken: string): Boolean;
     function RefreshSlot(const ATenantID: string; const ASlotToken: string): Boolean;
     procedure ReleaseSlot(const ATenantID: string; const ASlotToken: string);
     function GetGlobalMetrics(const ATenantID: string): TPoolMetrics;
+    function GetSlotTTL: Integer;
     property MaxRetries: Integer read FMaxRetries write FMaxRetries;
   end;
 
@@ -63,11 +74,61 @@ begin
     FNodeID := TGuid.NewGuid.ToString.Replace('{', '').Replace('}', '');
   FTTL := ATTL;
   FMaxRetries := 3;
+  FEndpoints := TStringList.Create;
+end;
+
+constructor TRedisPoolCoordinator.CreateSentinel(const ARedis: IRedisClient; const AServiceName: string; const AEndpoints: TStrings; const ANodeID: string; const ATTL: Integer);
+begin
+  Create(ARedis, ANodeID, ATTL);
+  FServiceName := AServiceName;
+  FEndpoints.Assign(AEndpoints);
+end;
+
+destructor TRedisPoolCoordinator.Destroy;
+begin
+  FEndpoints.Free;
+  inherited;
 end;
 
 function TRedisPoolCoordinator.GetNowUnix: string;
 begin
   Result := IntToStr(DateTimeToUnix(Now));
+end;
+
+procedure TRedisPoolCoordinator._DiscoverMaster;
+var
+  LAddress: TArray<string>;
+  I: Integer;
+  LEndpoint: string;
+  LParts: TArray<string>;
+begin
+  if (FServiceName = '') or (FEndpoints.Count = 0) then
+    Exit;
+
+  for I := 0 to FEndpoints.Count - 1 do
+  begin
+    LEndpoint := FEndpoints[I];
+    LParts := LEndpoint.Split([':']);
+    try
+      FRedis.SetEndpoint(LParts[0], StrToIntDef(LParts[1], 26379));
+      LAddress := FRedis.Execute('SENTINEL', ['get-master-addr-by-name', FServiceName]);
+      if Length(LAddress) >= 2 then
+      begin
+        _SetCurrentEndpoint(LAddress[0], StrToInt(LAddress[1]));
+        Exit;
+      end;
+    except
+      // Try next sentinel
+    end;
+  end;
+  raise Exception.Create('Could not discover Redis Master via Sentinels');
+end;
+
+procedure TRedisPoolCoordinator._SetCurrentEndpoint(const AHost: string; const APort: Integer);
+begin
+  FCurrentMasterHost := AHost;
+  FCurrentMasterPort := APort;
+  FRedis.SetEndpoint(FCurrentMasterHost, FCurrentMasterPort);
 end;
 
 function TRedisPoolCoordinator.ExecuteWithRetry(const AFunc: TFunc<string>): string;
@@ -79,12 +140,27 @@ begin
   for LRetry := 0 to FMaxRetries do
   begin
     try
+      // If we use Sentinels and don't have a master yet, discover it
+      if (FEndpoints.Count > 0) and (FCurrentMasterHost = '') then
+        _DiscoverMaster;
+        
       Result := AFunc();
       Exit;
     except
       on E: Exception do
       begin
         LExc := E;
+        // ADR-014: Trigger re-discovery on connection error if Sentinels are configured
+        if (FEndpoints.Count > 0) then
+        begin
+          FCurrentMasterHost := ''; // Invalidate cache
+          try
+            _DiscoverMaster;
+          except
+            // Ignore discovery error here, will retry or fail in the next loop iteration
+          end;
+        end;
+
         if LRetry < FMaxRetries then
           Sleep(100 * (LRetry + 1))
         else
@@ -215,6 +291,11 @@ begin
   except
     // Return empty metrics on failure
   end;
+end;
+
+function TRedisPoolCoordinator.GetSlotTTL: Integer;
+begin
+  Result := FTTL;
 end;
 
 end.

@@ -21,10 +21,16 @@ type
   private
     FSlots: TDictionary<string, TDictionary<string, Int64>>; // Key -> { Member -> Score }
     FLock: TCriticalSection;
+    FCurrentHost: string;
+    FCurrentPort: Integer;
   public
     constructor Create;
     destructor Destroy; override;
     function Eval(const AScript: string; const AKeys: array of string; const AArgs: array of string): string;
+    function Execute(const ACommand: string; const AArgs: array of string): TArray<string>;
+    procedure SetEndpoint(const AHost: string; const APort: Integer);
+    property CurrentHost: string read FCurrentHost;
+    property CurrentPort: Integer read FCurrentPort;
   end;
 
 constructor TMockRedisClient.Create;
@@ -39,6 +45,29 @@ begin
   FSlots.Free;
   FLock.Free;
   inherited;
+end;
+
+procedure TMockRedisClient.SetEndpoint(const AHost: string; const APort: Integer);
+begin
+  FCurrentHost := AHost;
+  FCurrentPort := APort;
+end;
+
+function TMockRedisClient.Execute(const ACommand: string; const AArgs: array of string): TArray<string>;
+begin
+  if (ACommand = 'SENTINEL') and (AArgs[0] = 'get-master-addr-by-name') then
+  begin
+    if AArgs[1] = 'mymaster' then
+    begin
+      SetLength(Result, 2);
+      Result[0] := '127.0.0.1';
+      Result[1] := '6379';
+    end
+    else
+      raise Exception.Create('Sentinel: master not found');
+  end
+  else
+    raise Exception.Create('Mock Redis: Command not implemented: ' + ACommand);
 end;
 
 function TMockRedisClient.Eval(const AScript: string; const AKeys: array of string; const AArgs: array of string): string;
@@ -123,6 +152,40 @@ begin
   end;
 end;
 
+procedure TestSentinelDiscovery;
+var
+  LRedis: TMockRedisClient;
+  LCoordinator: TRedisPoolCoordinator;
+  LEndpoints: TStrings;
+  LToken: string;
+begin
+  Writeln('Testing Sentinel Discovery...');
+  LRedis := TMockRedisClient.Create;
+  LEndpoints := TStringList.Create;
+  try
+    LEndpoints.Add('192.168.1.100:26379');
+    LEndpoints.Add('192.168.1.101:26379');
+    
+    LCoordinator := TRedisPoolCoordinator.CreateSentinel(LRedis, 'mymaster', LEndpoints, 'NodeS', 60);
+    try
+      // The first call should trigger discovery
+      if LCoordinator.AcquireSlot('TenantS', 10, 1000, LToken) then
+      begin
+        Writeln('Slot acquired through Sentinel-discovered master.');
+        if LRedis.CurrentHost <> '127.0.0.1' then
+          raise Exception.Create('Test failed: Current host should be 127.0.0.1 (discovered), but was ' + LRedis.CurrentHost);
+      end
+      else
+        raise Exception.Create('Test failed: Could not acquire slot');
+    finally
+      LCoordinator.Free;
+    end;
+  finally
+    LEndpoints.Free;
+  end;
+  Writeln('Sentinel test passed.');
+end;
+
 procedure TestDistributedLimit;
 var
   LRedis: IRedisClient;
@@ -194,8 +257,8 @@ var
 begin
   Writeln('Testing Distributed Heartbeat (Resiliency)...');
   LRedis := TMockRedisClient.Create;
-  // TTL of 5 seconds
-  LCoordinator := TRedisPoolCoordinator.Create(LRedis, 'NodeH', 5);
+  // TTL of 6 seconds. Renewal should happen at 3s.
+  LCoordinator := TRedisPoolCoordinator.Create(LRedis, 'NodeH', 6);
   PoolManager.SetCoordinator(LCoordinator);
 
   LConn := PoolManager.AcquireConnection(
@@ -205,32 +268,13 @@ begin
     1000
   );
 
-  Writeln('Connection acquired. Holding for 15 seconds (TTL is 5s)...');
-  // Hold connection for 15 seconds. Without heartbeat, slot would expire in 5s.
-  // Heartbeat should renew it every ~5s (Sleep in thread) or when 25s passed (logic check).
-  // Wait, I adjusted logic to 25s in TPoolConnection but TTL is 5s here. 
-  // I should adjust the test TTL or the logic to be more generic (e.g. 50% of TTL).
-  // In TPoolConnection I used 25s constant. Let's fix that to use 50% of TTL if possible,
-  // but for now I'll use a longer TTL in test.
-  
-  // Re-creating with 60s TTL
-  PoolManager.Clear;
-  LCoordinator := TRedisPoolCoordinator.Create(LRedis, 'NodeH', 60);
-  PoolManager.SetCoordinator(LCoordinator);
-  
-  LConn := PoolManager.AcquireConnection(
-    'HeartbeatTenant',
-    function: IDBConnection begin Result := TStubConnection.Create; end,
-    1,
-    1000
-  );
-
-  // We'll simulate 30s passing by manually updating FLastRenewal or just waiting.
-  // The test thread checks every 5s.
-  Sleep(35000); 
+  Writeln('Connection acquired. Holding for 10 seconds (TTL is 6s)...');
+  // Hold connection for 10 seconds. Without heartbeat, slot would expire in 6s.
+  // With dynamic logic (TTL/2 = 3s), it should renew at 3s and 6s and 9s.
+  Sleep(10000); 
   
   LMetrics := PoolManager.GetMetrics('HeartbeatTenant');
-  Writeln(Format('Metrics after 35s: Busy=%d, GlobalBusy=%d', [LMetrics.LocalBusyConnections, LMetrics.DistributedSlotsBusy]));
+  Writeln(Format('Metrics after 10s: Busy=%d, GlobalBusy=%d', [LMetrics.LocalBusyConnections, LMetrics.DistributedSlotsBusy]));
   
   if LMetrics.DistributedSlotsBusy = 0 then
     raise Exception.Create('Test failed: Slot expired despite heartbeat');
@@ -275,7 +319,9 @@ begin
     Writeln('');
     TestDistributedMetrics;
     Writeln('');
-    // TestDistributedHeartbeat; // This one is slow (35s), enable if needed or adjust TTL
+    TestDistributedHeartbeat;
+    Writeln('');
+    TestSentinelDiscovery;
     Writeln('Validation: SUCCESS');
   except
     on E: Exception do

@@ -415,6 +415,7 @@ type
     function RefreshSlot(const ATenantID: string; const ASlotToken: string): Boolean;
     procedure ReleaseSlot(const ATenantID: string; const ASlotToken: string);
     function GetGlobalMetrics(const ATenantID: string): TPoolMetrics;
+    function GetSlotTTL: Integer;
   end;
 
   IDBPoolManager = interface

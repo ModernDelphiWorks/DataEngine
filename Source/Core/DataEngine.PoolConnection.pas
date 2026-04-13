@@ -379,8 +379,8 @@ begin
       begin
         if FSlotTokens.TryGetValue(LConn, LToken) then
         begin
-          // ADR-054: Renew if at 50% of TTL (approx 30s by default if TTL is 60s)
-          if SecondsBetween(LNow, FLastRenewal[LConn]) > 25 then 
+          // ADR-015: Renew if at 50% of TTL (proportional to actual slot TTL)
+          if SecondsBetween(LNow, FLastRenewal[LConn]) >= (FCoordinator.GetSlotTTL div 2) then 
             LRenewalList.Add(LConn, LToken);
         end;
       end;

@@ -2,7 +2,7 @@
 
 Este documento delineia a evolução passada e os objetivos futuros do projeto **DataEngine**.
 
-**Última atualização:** 2026-04-10 (v1.0.0 Global Release - Stabilization & Pooling Completed)
+**Última atualização:** 2026-04-12 (v1.1.2 Redis Pooling High Availability Planning)
 
 ## Concluído (Histórico de Sprints)
 
@@ -18,6 +18,12 @@ Este documento delineia a evolução passada e os objetivos futuros do projeto *
 - [x] **SPRINT-07: Auto-Invalidation** — Limpeza inteligente de cache via interceptação DML.
 - [x] **SPRINT-08: Metadata Cache (Part 1: Infrastructure)** — Entrega v0.8.0 com infraestrutura base, serializer e hooks para FireDAC/UniDAC.
 - [x] **SPRINT-08: Metadata Cache (Part 2: Universal Integration)** — Cobertura para drivers Zeos, DBExpress, SQLite3 e Benchmarking formal.
+
+### Q2 2026 (Refinement & Ecosystem)
+- [x] **SPRINT-20: Schema Migrations (Foundation)** — Interface `IDBMigration` e orquestrador de versões.
+- [x] **SPRINT-21: FluentSQL Integration** — Bridge para tradução agnóstica de DDL.
+- [x] **SPRINT-22: Horse Middleware** — Adaptadores automáticos para transações HTTP — delivered v1.1.0 2026-04-12
+- [x] **ESP-052: Workspace Cleanup** — Padronização de estrutura e isolamento de arquivos locais — delivered v1.1.1 2026-04-12
 
 ---
 
@@ -49,7 +55,7 @@ Este documento delineia a evolução passada e os objetivos futuros do projeto *
 
 - [x] **SPRINT-20: Schema Migrations (Foundation)** — Interface `IDBMigration` e orquestrador de versões.
 - [x] **SPRINT-21: FluentSQL Integration** — Bridge para tradução agnóstica de DDL.
-- [ ] **SPRINT-22: Horse Middleware** — Adaptadores automáticos para transações HTTP.
+- [x] **SPRINT-22: Horse Middleware** — Adaptadores automáticos para transações HTTP.
 - [ ] **SPRINT-23: Redis Distributed Pooling** — Pool coordenado para larga escala.
 
 

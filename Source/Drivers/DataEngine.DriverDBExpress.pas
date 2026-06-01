@@ -543,6 +543,8 @@ end;
 
 procedure TDriverDataSetDBExpress._SetCommandText(const ACommandText: String);
 begin
+  if FDataSet.Active then
+    Exit;
   FDataSet.CommandText := ACommandText;
 end;
 

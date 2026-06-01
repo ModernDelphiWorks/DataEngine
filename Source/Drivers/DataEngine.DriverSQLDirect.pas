@@ -473,6 +473,8 @@ end;
 
 procedure TDriverDataSetSQLDirect._SetCommandText(const ACommandText: String);
 begin
+  if FDataSet.Active then
+    Exit;
   FDataSet.SQL.Text := ACommandText;
 end;
 

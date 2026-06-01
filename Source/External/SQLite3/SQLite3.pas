@@ -1,3 +1,16 @@
+{
+  ------------------------------------------------------------------------------
+  DataEngine
+  High-performance database engine abstraction framework for Delphi and Lazarus.
+
+  SPDX-License-Identifier: MIT
+  Copyright (c) 2025-2026 Isaque Pinheiro
+
+  Licensed under the MIT License.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
+}
+
 unit SQLite3;
 {$I SQLite3.inc}
 {

@@ -1994,9 +1994,6 @@ begin
       Result := _InternalExecuteQuery;
       LStopwatch.Stop;
 
-      if Assigned(Result) then
-        Result.CommandText := _GetCommandText;
-
       _Notify(teQueryEnd, _GetCommandText, _GetParams, LStopwatch.ElapsedMilliseconds, 0, 0);
 
       if Assigned(FCacheProvider) and Assigned(Result) then

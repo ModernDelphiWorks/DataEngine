@@ -370,6 +370,7 @@ end;
 function TDriverQueryFireDAC._InternalExecuteQuery: IDBDataSet;
 var
   LDataSet: TFDQuery;
+  LTransaction: TFDTransaction;
   LParams: TParams;
   LFor: Int16;
   LHasMetadataCache: Boolean;
@@ -379,19 +380,22 @@ begin
   try
     if not Assigned(FFDQuery.Connection) then
       raise Exception.Create('Connection not assigned.');
-    if _GetTransactionActive = nil then
-      raise Exception.Create('Transaction not assigned.');
 
+    LTransaction := _GetTransactionActive;
     LDataSet.Connection := FFDQuery.Connection;
-    LDataSet.Transaction := _GetTransactionActive;
+    if (LTransaction <> nil) and LTransaction.Active then
+      LDataSet.Transaction := LTransaction;
     LDataSet.SQL.Text := FFDQuery.SQL.Text;
 
     LHasMetadataCache := False;
     LHasMetadataCache := _TryApplyMetadataCache(LDataSet.SQL.Text, LDataSet.FieldDefs);
-    LDataSet.FetchOptions.Mode := FireDAC.Stan.Option.TFDFetchMode(Ord(FFetchOptions.Mode));
-    LDataSet.FetchOptions.RowsetSize := FFetchOptions.BatchSize;
-    if FFetchOptions.Mode = fmOnDemand then
-      LDataSet.FetchOptions.Unidirectional := True;
+    if FFetchOptions.Mode <> fmAll then
+    begin
+      LDataSet.FetchOptions.Mode := FireDAC.Stan.Option.TFDFetchMode(Ord(FFetchOptions.Mode));
+      LDataSet.FetchOptions.RowsetSize := FFetchOptions.BatchSize;
+      if FFetchOptions.Mode = fmOnDemand then
+        LDataSet.FetchOptions.Unidirectional := True;
+    end;
 
     try
       if FFDQuery.Params.Count > 0 then
@@ -444,7 +448,12 @@ begin
     if Assigned(LDataSet) then
     begin
       if (not LDataSet.Active) and (LDataSet.SQL.Text <> '') then
-        _SetMonitorLog(LDataSet.SQL.Text, LDataSet.Transaction.Name, LParams);
+      begin
+        if Assigned(LDataSet.Transaction) then
+          _SetMonitorLog(LDataSet.SQL.Text, LDataSet.Transaction.Name, LParams)
+        else
+          _SetMonitorLog(LDataSet.SQL.Text, '(no transaction)', LParams);
+      end;
     end;
     if Assigned(LParams) then
     begin
@@ -585,6 +594,8 @@ end;
 
 procedure TDriverDataSetFireDAC._SetCommandText(const ACommandText: String);
 begin
+  if FDataSet.Active then
+    Exit;
   FDataSet.SQL.Text := ACommandText;
 end;
 

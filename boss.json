@@ -1,9 +1,9 @@
 {
-	"name": "DBEngine4D",
-	"description": "A flexible and modular database engine framework for Delphi applications",
-	"version": "0.16.0",
-	"homepage": "https://github.com/moderndelphiworks",
-	"mainsrc": "./Source",
-	"projects": [],
-	"dependencies": {}
+  "name": "DBEngine4D",
+  "description": "A flexible and modular database engine framework for Delphi applications",
+  "version": "0.16.0",
+  "homepage": "https://github.com/ModernDelphiWorks/DataEngine",
+  "mainsrc": "./Source",
+  "projects": [],
+  "dependencies": {}
 }

@@ -82,3 +82,7 @@ __recovery/
 modules/
 tmp/
 local-readonly/
+
+# Boss package manager files
+!boss.json
+!boss-lock.json

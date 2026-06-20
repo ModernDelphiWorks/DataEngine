@@ -30,7 +30,7 @@ uses
   FireDAC.Stan.Error, FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def,
   FireDAC.Stan.Pool, FireDAC.Stan.Async, FireDAC.Phys, FireDAC.Phys.MongoDB,
   FireDAC.Phys.MongoDBDef, FireDAC.Phys.MongoDBWrapper,
-  FireDAC.VCLUI.Wait, FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf,
+  {$IFDEF MSWINDOWS}FireDAC.VCLUI.Wait,{$ELSE}FireDAC.ConsoleUI.Wait,{$ENDIF} FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf,
   FireDAC.Phys.MongoDBDataSet, FireDAC.Comp.Client,
   FireDAC.Comp.UI,
   // DBE

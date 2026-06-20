@@ -30,6 +30,14 @@ uses
   FireDAC.Stan.Intf,
   FireDAC.Stan.Option,
   FireDAC.Stan.Error,
+  // Epic 25 — cross-platform FireDAC registration. On Windows these factories are
+  // auto-registered via VCL-side units; a standalone/console/Linux build does NOT
+  // pull those, so register them explicitly here: the definition manager, the
+  // Firebird physical driver, and a HEADLESS wait-UI (ConsoleUI.Wait works on both
+  // Windows and Linux, unlike the VCL-only VCLUI.Wait).
+  FireDAC.Stan.Def,
+  FireDAC.Phys.FB,
+  FireDAC.ConsoleUI.Wait,
   DataEngine.DriverConnection,
   DataEngine.FactoryInterfaces,
   DataEngine.Metadata.Manager;

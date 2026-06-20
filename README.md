@@ -28,6 +28,17 @@
 | **Delphi XE or superior** | VCL, FMX, Console (Win/Linux/macOS/iOS/Android) | ✅ Yes | ✅ Yes |
 | **Lazarus / FreePascal** | LCL, Console (Cross-platform) | ✅ Yes | ✅ Yes |
 
+### 🐧 Cross-Platform Build — Win32 / Win64 / Linux64 (verified)
+
+> **✅ Verified 2026-06-20** in a real production backend: DataEngine compiles as a dependency on **Win32, Win64 and Linux64** (`dcclinux64`), and the Linux server boots through FireDAC connection setup. macOS/iOS/Android follow from the Delphi RTL but are **not build-verified** here yet.
+
+Windows-only pieces are guarded for non-Windows targets: the `MidasLib` (`TClientDataSet` runtime) is `{$IFDEF MSWINDOWS}`-guarded, and FireDAC is registered cross-platform in `DataEngine.DriverFireDac` — `FireDAC.Stan.Def` + `FireDAC.Phys.FB` + the **headless** `FireDAC.ConsoleUI.Wait` — so console/Linux builds register the driver factory without the VCL wait-UI.
+
+**Building a consumer app for Linux64:**
+1. Install the Linux 64-bit platform — RAD Studio GetIt, or `GetItCmd -if=delphi_linux -ae`.
+2. Provide a Linux SDK — the RAD Studio SDK Manager (+ PAServer), **or** assemble a sysroot from a WSL/Linux toolchain (`build-essential`) and pass `--syslibroot` / `--libpath` to `dcclinux64`.
+3. Compile with `dcclinux64` via a console build harness (generate a response file from the project search path to bypass the Win32 32 KB command-line limit).
+
 ### ⚙️ Installation
 
 To install using the package manager [**Boss**](https://github.com/HashLoad/boss):
@@ -126,6 +137,17 @@ end;
 | :--- | :--- | :---: | :---: |
 | **Delphi XE ou superior** | VCL, FMX, Console (Win/Linux/macOS/iOS/Android) | ✅ Sim | ✅ Sim |
 | **Lazarus / FreePascal** | LCL, Console (Multiplataforma) | ✅ Sim | ✅ Sim |
+
+### 🐧 Build Multiplataforma — Win32 / Win64 / Linux64 (verificado)
+
+> **✅ Verificado em 2026-06-20** num backend real em produção: o DataEngine compila como dependência em **Win32, Win64 e Linux64** (`dcclinux64`), e o servidor Linux sobe até a configuração de conexão FireDAC. macOS/iOS/Android seguem da RTL Delphi, mas **ainda não foram verificados** em build aqui.
+
+As partes Windows-only ficam guardadas para alvos não-Windows: o `MidasLib` (runtime do `TClientDataSet`) está sob `{$IFDEF MSWINDOWS}`, e o FireDAC é registrado de forma multiplataforma em `DataEngine.DriverFireDac` — `FireDAC.Stan.Def` + `FireDAC.Phys.FB` + o `FireDAC.ConsoleUI.Wait` **headless** — para builds console/Linux registrarem o factory do driver sem o wait-UI da VCL.
+
+**Para buildar um app consumidor no Linux64:**
+1. Instale a plataforma Linux 64-bit — RAD Studio GetIt, ou `GetItCmd -if=delphi_linux -ae`.
+2. Forneça um SDK Linux — o SDK Manager do RAD Studio (+ PAServer), **ou** monte um sysroot a partir de um toolchain WSL/Linux (`build-essential`) e passe `--syslibroot` / `--libpath` ao `dcclinux64`.
+3. Compile com `dcclinux64` via um harness de console (gere um response file a partir do search path do projeto para contornar o limite de 32 KB de linha de comando do Win32).
 
 ### ⚙️ Instalação
 

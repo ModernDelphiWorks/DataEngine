@@ -1,4 +1,4 @@
-# DataEngine Framework for Delphi & Lazarus
+# DataEngine — high-performance DB-engine abstraction for Delphi/Lazarus
 
 [![Delphi XE+](https://img.shields.io/badge/Delphi-XE%20or%20superior-blue.svg)]()
 [![Lazarus Compatible](https://img.shields.io/badge/Lazarus-Compatible-orange.svg)]()
@@ -7,7 +7,7 @@
 
 > 🔒 **Supply-chain transparency (CRA-ready):** a machine-readable **SBOM** (CycloneDX) is published on the package portal — [pubpascal.dev/packages/dataengine](https://www.pubpascal.dev/packages/dataengine) · security disclosure policy in **[SECURITY.md](SECURITY.md)** · changes tracked in **[CHANGELOG.md](CHANGELOG.md)**.
 
-📚 **[Documentation](https://moderndelphiworks.github.io/DataEngine/)**
+📚 **[Documentation](https://moderndelphiworks.github.io/DataEngine/)** · ⬇️ **[Download](../../releases)** · 🐛 **[Issues](../../issues)**
 
 *   [🇬🇧 English](#-english)
 *   [🇧🇷 Português](#-português)
@@ -46,12 +46,13 @@ Windows-only pieces are guarded for non-Windows targets: the `MidasLib` (`TClien
 
 ### ⚙️ Installation
 
-To install using the package manager [**Boss**](https://github.com/HashLoad/boss):
+**Boss** (recommended):
 
 ```sh
 boss install DataEngine
 ```
 
+**PubPascal** — also available at [pubpascal.dev/packages/dataengine](https://www.pubpascal.dev/packages/dataengine) with SBOM and security metadata.
 
 ---
 
@@ -154,14 +155,13 @@ As partes Windows-only ficam guardadas para alvos não-Windows: o `MidasLib` (ru
 
 ### ⚙️ Instalação
 
-Para instalar usando o gerenciador de pacotes [**Boss**](https://github.com/HashLoad/boss):
+**Boss** (recomendado):
 
 ```sh
 boss install DataEngine
 ```
 
-> [!NOTE]
-> Por motivos históricos de registro no Boss, o pacote é declarado como **DataEngine** no manifesto, embora o nome oficial do projeto seja **DataEngine**.
+**PubPascal** — disponível também em [pubpascal.dev/packages/dataengine](https://www.pubpascal.dev/packages/dataengine) com SBOM e metadados de segurança.
 
 ---
 
@@ -231,4 +231,40 @@ end;
 ```
 
 ---
-*Copyright © 2025-2026 Isaque Pinheiro. Licensed under MIT License.*
+
+## ⛏️ Contributing / Contribuição
+
+**EN** — Contributions are welcome! Whether it's a bug report, a feature request, or a pull request, your input helps improve DataEngine for the whole Delphi/Lazarus community.
+
+**PT** — Contribuições são bem-vindas! Bug reports, sugestões de funcionalidades ou pull requests — toda ajuda é valorizada e melhora o DataEngine para toda a comunidade Delphi/Lazarus.
+
+[![Issues](https://img.shields.io/badge/Issues-channel-orange)](../../issues)
+
+**5-step PR guide:**
+1. Fork the repository and create a feature branch from `main`.
+2. Write or update tests covering your change.
+3. Ensure all existing tests pass before submitting.
+4. Keep commits small and focused; reference the relevant issue number.
+5. Open a Pull Request describing *what* changed and *why*.
+
+---
+
+## 📬 Contact / Contato
+
+[![Email](https://img.shields.io/badge/Email-isaquesp%40gmail.com-D14836?logo=gmail&logoColor=white)](mailto:isaquesp@gmail.com)
+
+---
+
+## 💲 Donation / Doação
+
+If DataEngine saves you time, consider buying the author a coffee.
+Se o DataEngine te poupa tempo, considere apoiar o autor.
+
+[![Doação](https://img.shields.io/badge/PagSeguro-contribua-green)](https://pag.ae/bglQrWD)
+
+---
+
+## 📄 License / Licença
+
+DataEngine is released under the **MIT License** — see [LICENSE](LICENSE) for full terms.
+DataEngine é distribuído sob a **Licença MIT** — consulte [LICENSE](LICENSE) para os termos completos.

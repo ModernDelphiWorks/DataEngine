@@ -186,6 +186,8 @@ type
     function RecordCount: UInt32;
     function FieldDefs: TFieldDefs;
     function Eof: Boolean;
+    function NotEof: Boolean;
+    function GetFieldValue(const AFieldName: string): Variant;
     function Bof: Boolean;
     function RecNo: Integer;
     function CanRefresh: Boolean;

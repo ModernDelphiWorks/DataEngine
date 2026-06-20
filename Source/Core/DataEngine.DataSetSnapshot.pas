@@ -27,6 +27,7 @@ type
   private
     FData: TDataSet; // Generic Internal DataSet (could be any TDataSet wrapper)
     FSource: IDBDataSet; // Reference to source if needed
+    FNotEofStarted: Boolean;
   protected
     // IDBDataSet implementation delegating to FData
     function _GetFilter: String;
@@ -138,6 +139,8 @@ type
     function RecordCount: UInt32;
     function FieldDefs: TFieldDefs;
     function Eof: Boolean;
+    function NotEof: Boolean;
+    function GetFieldValue(const AFieldName: string): Variant;
     function Bof: Boolean;
     function RecNo: Integer;
     function CanRefresh: Boolean;
@@ -281,6 +284,20 @@ var
 begin
   LNewData := TInMemoryDataFactory.CloneDataSet(FData);
   Result := TDataSetSnapshot.Create(LNewData, True);
+end;
+
+function TDataSetSnapshot.NotEof: Boolean;
+begin
+  if FNotEofStarted then
+    FData.Next
+  else
+    FNotEofStarted := True;
+  Result := not FData.Eof;
+end;
+
+function TDataSetSnapshot.GetFieldValue(const AFieldName: string): Variant;
+begin
+  Result := _GetFieldValue(AFieldName);
 end;
 
 function TDataSetSnapshot._GetActive: Boolean; begin Result := FData.Active; end;

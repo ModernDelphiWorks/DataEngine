@@ -178,6 +178,7 @@ type
     FFetchStopwatch: TStopwatch;
     FFetchStarted: Boolean;
     FCommandText: string;
+    FNotEofStarted: Boolean;
     function _GetFilter: String; virtual;
     function _GetFiltered: Boolean; virtual;
     function _GetFilterOptions: TFilterOptions; virtual;
@@ -293,6 +294,8 @@ type
     function RecordCount: UInt32; virtual;
     function FieldDefs: TFieldDefs; virtual;
     function Eof: Boolean; virtual;
+    function NotEof: Boolean;
+    function GetFieldValue(const AFieldName: string): Variant;
     function Bof: Boolean; virtual;
     function RecNo: Integer; virtual;
     function CanRefresh: Boolean; virtual;
@@ -664,6 +667,20 @@ end;
 function TDriverDataSetBase.Eof: Boolean;
 begin
   Result := True;
+end;
+
+function TDriverDataSetBase.NotEof: Boolean;
+begin
+  if FNotEofStarted then
+    Next
+  else
+    FNotEofStarted := True;
+  Result := not Eof;
+end;
+
+function TDriverDataSetBase.GetFieldValue(const AFieldName: string): Variant;
+begin
+  Result := _GetFieldValue(AFieldName);
 end;
 
 function TDriverDataSetBase.Bof: Boolean;

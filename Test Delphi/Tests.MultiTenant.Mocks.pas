@@ -33,7 +33,7 @@ type
     function BulkLoader: IDBBulkLoader;
     function GetSQLScripts: String;
     function RowsAffected: UInt32;
-    function GetDriver: TDBEngineDriver;
+    function GetDriver: TDriverName;
     function CommandMonitor: ICommandMonitor;
     function MonitorCallback: TMonitorProc;
     function Options: IOptions;
@@ -72,7 +72,7 @@ procedure TStubConnection.ExecuteDirect(const ASQL: String); begin end;
 procedure TStubConnection.ExecuteDirect(const ASQL: String; const AParams: TParams); begin end;
 procedure TStubConnection.ExecuteScript(const AScript: String); begin end;
 procedure TStubConnection.ExecuteScripts; begin end;
-function TStubConnection.GetDriver: TDBEngineDriver; begin Result := dnMemory; end;
+function TStubConnection.GetDriver: TDriverName; begin Result := dnMemory; end;
 function TStubConnection.GetSQLScripts: String; begin Result := ''; end;
 function TStubConnection.InTransaction: Boolean; begin Result := False; end;
 function TStubConnection.IsAlive: Boolean; begin Result := True; end;

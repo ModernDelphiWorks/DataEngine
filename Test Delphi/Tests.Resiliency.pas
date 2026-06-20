@@ -43,7 +43,7 @@ type
     function CreateDataSet(const ASQL: String = ''): IDBDataSet; virtual;
     function GetSQLScripts: String; virtual;
     function RowsAffected: UInt32; virtual;
-    function GetDriver: TDBEngineDriver; virtual;
+    function GetDriver: TDriverName; virtual;
     function CommandMonitor: ICommandMonitor; virtual;
     procedure SetCommandMonitor(AMonitor: ICommandMonitor); virtual;
     function MonitorCallback: TMonitorProc; virtual;
@@ -124,7 +124,7 @@ function TMockConnection.CreateQuery: IDBQuery; begin Result := nil; end;
 function TMockConnection.CreateDataSet(const ASQL: String): IDBDataSet; begin Result := nil; end;
 function TMockConnection.GetSQLScripts: String; begin Result := ''; end;
 function TMockConnection.RowsAffected: UInt32; begin Result := 0; end;
-function TMockConnection.GetDriver: TDBEngineDriver; begin Result := TDBEngineDriver.dnSQLite; end;
+function TMockConnection.GetDriver: TDriverName; begin Result := TDriverName.dnSQLite; end;
 function TMockConnection.CommandMonitor: ICommandMonitor; begin Result := nil; end;
 procedure TMockConnection.SetCommandMonitor(AMonitor: ICommandMonitor); begin end;
 function TMockConnection.MonitorCallback: TMonitorProc; begin Result := nil; end;

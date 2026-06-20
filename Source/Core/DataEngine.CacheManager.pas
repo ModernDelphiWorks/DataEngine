@@ -28,7 +28,7 @@ uses
 type
   TCacheManager = class
   public
-    class function GenerateQueryHash(const ASQL: string; AParams: TParams; const ADriver: TDBEngineDriver): string; static;
+    class function GenerateQueryHash(const ASQL: string; AParams: TParams; const ADriver: TDriverName): string; static;
     class function CreateSnapshot(const ASource: IDBDataSet): IDBDataSetSnapshot; static;
     class procedure SerializeToStream(const ASnapshot: IDBDataSetSnapshot; AStream: TStream); static;
     class function DeserializeFromStream(AStream: TStream): IDBDataSetSnapshot; static;
@@ -48,7 +48,7 @@ uses
 
 { TCacheManager }
 
-class function TCacheManager.GenerateQueryHash(const ASQL: string; AParams: TParams; const ADriver: TDBEngineDriver): string;
+class function TCacheManager.GenerateQueryHash(const ASQL: string; AParams: TParams; const ADriver: TDriverName): string;
 var
   LInput: string;
   LIndex: Integer;

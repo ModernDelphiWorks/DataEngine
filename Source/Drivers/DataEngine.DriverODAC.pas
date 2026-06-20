@@ -32,7 +32,7 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
@@ -80,7 +80,7 @@ implementation
 { TDriverODAC }
 
 constructor TDriverODAC.Create(const AConnection: TComponent;
-  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDriverName;
   const AMonitorCallback: TMonitorProc);
 begin
   inherited;

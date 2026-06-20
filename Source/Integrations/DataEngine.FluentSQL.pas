@@ -123,7 +123,7 @@ begin
   if Assigned(AColumns) then
     AColumns(LBuilder);
   
-  LSQL := LBuilder.BuildSQL(TStrDBEngineDriver[AConnection.GetDriver], ATableName);
+  LSQL := LBuilder.BuildSQL(TStrDriverName[AConnection.GetDriver], ATableName);
   AConnection.ExecuteDirect(LSQL);
 end;
 

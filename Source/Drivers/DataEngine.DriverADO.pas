@@ -39,7 +39,7 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
@@ -115,7 +115,7 @@ end;
 { TDriverADO }
 
 constructor TDriverADO.Create(const AConnection: TComponent;
-  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDriverName;
   const AMonitorCallback: TMonitorProc);
 begin
   FConnection := AConnection as TADOConnection;

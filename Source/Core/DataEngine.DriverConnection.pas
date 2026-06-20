@@ -39,7 +39,7 @@ type
     FDriverTransaction: TDriverTransaction;
     FMonitorCallback: TMonitorProc;
     FUserMonitorCallback: TMonitorProc;
-    FDriver: TDBEngineDriver;
+    FDriver: TDriverName;
     FRowsAffected: UInt32;
     FCacheProvider: IDBCacheProvider;
     FMetadataCache: IDBMetadataCache;
@@ -60,7 +60,7 @@ type
     function _IsAlive: Boolean; virtual;
   public
     constructor Create(const AConnection: TComponent; const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDBEngineDriver; const AMonitorCallback: TMonitorProc;
+      const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc;
       const ACache: IDBCacheProvider = nil; const AMetadataCache: IDBMetadataCache = nil); virtual;
     procedure Connect; virtual;
     procedure Disconnect; virtual;
@@ -75,7 +75,7 @@ type
     function CreateDataSet(const ASQL: String): IDBDataSet; virtual;
     function GetSQLScripts: String; virtual;
     function RowsAffected: UInt32; virtual;
-    function GetDriver: TDBEngineDriver; virtual;
+    function GetDriver: TDriverName; virtual;
     function MonitorCallback: TMonitorProc; virtual;
     function Options: IOptions; virtual;
     function Cache: IDBCacheProvider; virtual;
@@ -130,7 +130,7 @@ type
     FMonitorCallback: TMonitorProc;
     FRowsAffected: UInt32;
     FCacheProvider: IDBCacheProvider;
-    FDriver: TDBEngineDriver;
+    FDriver: TDriverName;
     FMetadataCache: IDBMetadataCache;
     FFetchOptions: TFetchOptions;
     FSlowQueryThreshold: Integer;
@@ -156,7 +156,7 @@ type
     procedure _InternalExecuteDirect; virtual; abstract;
   public
     constructor Create(const ADriverTransaction: TDriverTransaction;
-      const AMonitorCallback: TMonitorProc; const ADriver: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc; const ADriver: TDriverName;
       const ACache: IDBCacheProvider = nil; const AMetadataCache: IDBMetadataCache = nil;
       const ASlowQueryThreshold: Integer = DEFAULT_SLOW_QUERY_THRESHOLD); virtual;
     destructor Destroy; override;
@@ -1901,7 +1901,7 @@ end;
 { TDriverQuery }
 
 constructor TDriverQuery.Create(const ADriverTransaction: TDriverTransaction;
-  const AMonitorCallback: TMonitorProc; const ADriver: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc; const ADriver: TDriverName;
   const ACache: IDBCacheProvider; const AMetadataCache: IDBMetadataCache;
   const ASlowQueryThreshold: Integer);
 begin
@@ -2375,7 +2375,7 @@ begin
 end;
 
 constructor TDriverConnection.Create(const AConnection: TComponent;
-  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDriverName;
   const AMonitorCallback: TMonitorProc; const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
 begin
@@ -2410,7 +2410,7 @@ begin
   inherited;
 end;
 
-function TDriverConnection.GetDriver: TDBEngineDriver;
+function TDriverConnection.GetDriver: TDriverName;
 begin
   Result := FDriver;
 end;

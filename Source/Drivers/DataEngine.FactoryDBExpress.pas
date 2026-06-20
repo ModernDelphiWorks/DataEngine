@@ -27,10 +27,10 @@ type
   TFactoryDBExpress = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TSQLConnection;
-      const ADriver: TDBEngineDriver); overload;
-    constructor Create(const AConnection: TSQLConnection; const ADriver: TDBEngineDriver;
+      const ADriver: TDriverName); overload;
+    constructor Create(const AConnection: TSQLConnection; const ADriver: TDriverName;
       const AMonitor: ICommandMonitor); overload;
-    constructor Create(const AConnection: TSQLConnection; const ADriver: TDBEngineDriver;
+    constructor Create(const AConnection: TSQLConnection; const ADriver: TDriverName;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -45,7 +45,7 @@ uses
 { TFactoryDBExpress }
 
 constructor TFactoryDBExpress.Create(const AConnection: TSQLConnection;
-  const ADriver: TDBEngineDriver);
+  const ADriver: TDriverName);
 begin
   FDriverTransaction := TDriverDBExpressTransaction.Create(AConnection, FMonitorCallback);
   FDriverConnection  := TDriverDBExpress.Create(AConnection,
@@ -56,7 +56,7 @@ begin
 end;
 
 constructor TFactoryDBExpress.Create(const AConnection: TSQLConnection;
-  const ADriver: TDBEngineDriver; const AMonitor: ICommandMonitor);
+  const ADriver: TDriverName; const AMonitor: ICommandMonitor);
 begin
   FCommandMonitor := AMonitor;
   Create(AConnection, ADriver);
@@ -78,7 +78,7 @@ begin
 end;
 
 constructor TFactoryDBExpress.Create(const AConnection: TSQLConnection;
-  const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+  const ADriver: TDriverName; const AMonitorCallback: TMonitorProc);
 begin
   FMonitorCallback := AMonitorCallback;
   Create(AConnection, ADriver);

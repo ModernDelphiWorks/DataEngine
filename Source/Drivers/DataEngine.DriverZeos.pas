@@ -52,7 +52,7 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriver: TDBEngineDriver;
+      const ADriver: TDriverName;
       const AMonitorCallback: TMonitorProc;
       const ACache: IDBCacheProvider = nil;
       const AMetadataCache: IDBMetadataCache = nil); override;
@@ -137,7 +137,7 @@ end;
 
 constructor TDriverZeos.Create(const AConnection: TComponent;
   const ADriverTransaction: TDriverTransaction;
-  const ADriver: TDBEngineDriver;
+  const ADriver: TDriverName;
   const AMonitorCallback: TMonitorProc;
   const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
@@ -307,7 +307,7 @@ end;
 constructor TDriverQueryZeos.Create(const AConnection: TZConnection;
   const ADriverTransaction: TDriverTransaction;
   const AMonitorCallback: TMonitorProc;
-  const ADriver: TDBEngineDriver;
+  const ADriver: TDriverName;
   const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
 begin

@@ -28,12 +28,12 @@ type
   TFactorySQLite3 = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TSQLiteDatabase;
-      const ADriverName: TDBEngineDriver); overload;
+      const ADriverName: TDriverName); overload;
     constructor Create(const AConnection: TSQLiteDatabase;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitor: ICommandMonitor); overload;
     constructor Create(const AConnection: TSQLiteDatabase;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -48,7 +48,7 @@ uses
 { TFactorySQLite3 }
 
 constructor TFactorySQLite3.Create(const AConnection: TSQLiteDatabase;
-  const ADriverName: TDBEngineDriver);
+  const ADriverName: TDriverName);
 begin
   FDriverTransaction := TDriverSQLite3Transaction.Create(AConnection, FMonitorCallback);
   FDriverConnection  := TDriverSQLite3.Create(AConnection,
@@ -59,14 +59,14 @@ begin
 end;
 
 constructor TFactorySQLite3.Create(const AConnection: TSQLiteDatabase;
-  const ADriverName: TDBEngineDriver; const AMonitor: ICommandMonitor);
+  const ADriverName: TDriverName; const AMonitor: ICommandMonitor);
 begin
   FCommandMonitor := AMonitor;
   Create(AConnection, ADriverName);
 end;
 
 constructor TFactorySQLite3.Create(const AConnection: TSQLiteDatabase;
-  const ADriverName: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
 begin
   FDriverTransaction := TDriverSQLite3Transaction.Create(AConnection, FMonitorCallback);
   FDriverConnection  := TDriverSQLite3.Create(AConnection,

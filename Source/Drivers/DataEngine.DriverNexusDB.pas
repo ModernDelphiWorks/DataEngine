@@ -35,7 +35,7 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
@@ -95,7 +95,7 @@ implementation
 
 constructor TDriverNexusDB.Create(const AConnection: TComponent;
   const ADriverTransaction: TDriverTransaction;
-  const ADriverName: TDBEngineDriver;
+  const ADriverName: TDriverName;
   const AMonitorCallback: TMonitorProc);
 begin
   FConnection := AConnection as TnxDatabase;

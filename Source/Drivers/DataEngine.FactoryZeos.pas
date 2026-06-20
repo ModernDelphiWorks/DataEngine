@@ -28,12 +28,12 @@ type
   TFactoryZeos = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TZConnection;
-      const ADriver: TDBEngineDriver); overload;
+      const ADriver: TDriverName); overload;
     constructor Create(const AConnection: TZConnection;
-      const ADriver: TDBEngineDriver;
+      const ADriver: TDriverName;
       const AMonitor: ICommandMonitor); overload;
     constructor Create(const AConnection: TZConnection;
-      const ADriver: TDBEngineDriver;
+      const ADriver: TDriverName;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -48,7 +48,7 @@ uses
 { TFactoryZeos }
 
 constructor TFactoryZeos.Create(const AConnection: TZConnection;
-  const ADriver: TDBEngineDriver);
+  const ADriver: TDriverName);
 begin
   FDriverTransaction := TDriverZeosTransaction.Create(AConnection, FMonitorCallback);
   FDriverConnection  := TDriverZeos.Create(AConnection,
@@ -59,14 +59,14 @@ begin
 end;
 
 constructor TFactoryZeos.Create(const AConnection: TZConnection;
-  const ADriver: TDBEngineDriver; const AMonitor: ICommandMonitor);
+  const ADriver: TDriverName; const AMonitor: ICommandMonitor);
 begin
   FCommandMonitor := AMonitor;
   Create(AConnection, ADriver);
 end;
 
 constructor TFactoryZeos.Create(const AConnection: TZConnection;
-  const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+  const ADriver: TDriverName; const AMonitorCallback: TMonitorProc);
 begin
   FMonitorCallback := AMonitorCallback;
   Create(AConnection, ADriver);

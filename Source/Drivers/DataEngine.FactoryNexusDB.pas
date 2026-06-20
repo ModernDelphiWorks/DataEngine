@@ -27,12 +27,12 @@ type
   TFactoryNexusDB = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TnxDatabase;
-      const ADriverName: TDBEngineDriver); overload;
+      const ADriverName: TDriverName); overload;
     constructor Create(const AConnection: TnxDatabase;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitor: ICommandMonitor); overload;
     constructor Create(const AConnection: TnxDatabase;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -47,7 +47,7 @@ uses
 { TFactoryNexusDB }
 
 constructor TFactoryNexusDB.Create(const AConnection: TnxDatabase;
-  const ADriverName: TDBEngineDriver);
+  const ADriverName: TDriverName);
 begin
   FDriverTransaction := TDriverNexusDBTransaction.Create(AConnection, FMonitorCallback);
   FDriverConnection  := TDriverNexusDB.Create(AConnection,
@@ -58,14 +58,14 @@ begin
 end;
 
 constructor TFactoryNexusDB.Create(const AConnection: TnxDatabase;
-  const ADriverName: TDBEngineDriver; const AMonitor: ICommandMonitor);
+  const ADriverName: TDriverName; const AMonitor: ICommandMonitor);
 begin
   FCommandMonitor := AMonitor;
   Create(AConnection, ADriverName);
 end;
 
 constructor TFactoryNexusDB.Create(const AConnection: TnxDatabase;
-  const ADriverName: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+  const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc);
 begin
   FMonitorCallback := AMonitorCallback;
   Create(AConnection, ADriverName);

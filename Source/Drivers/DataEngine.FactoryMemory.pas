@@ -25,10 +25,10 @@ uses
 type
   TFactoryMemory = class(TFactoryConnection)
   public
-    constructor Create(const AConnection: TComponent; const ADriver: TDBEngineDriver); overload;
-    constructor Create(const AConnection: TComponent; const ADriver: TDBEngineDriver;
+    constructor Create(const AConnection: TComponent; const ADriver: TDriverName); overload;
+    constructor Create(const AConnection: TComponent; const ADriver: TDriverName;
       const AMonitor: ICommandMonitor); overload;
-    constructor Create(const AConnection: TComponent; const ADriver: TDBEngineDriver;
+    constructor Create(const AConnection: TComponent; const ADriver: TDriverName;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -42,7 +42,7 @@ uses
 { TFactoryMemory }
 
 constructor TFactoryMemory.Create(const AConnection: TComponent;
-  const ADriver: TDBEngineDriver);
+  const ADriver: TDriverName);
 begin
   // Create driver transaction first, which expects TMemoryConnection
   FDriverTransaction := TDriverMemoryTransaction.Create(AConnection, FMonitorCallback);
@@ -56,14 +56,14 @@ begin
 end;
 
 constructor TFactoryMemory.Create(const AConnection: TComponent;
-  const ADriver: TDBEngineDriver; const AMonitor: ICommandMonitor);
+  const ADriver: TDriverName; const AMonitor: ICommandMonitor);
 begin
   FCommandMonitor := AMonitor;
   Create(AConnection, ADriver);
 end;
 
 constructor TFactoryMemory.Create(const AConnection: TComponent;
-  const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+  const ADriver: TDriverName; const AMonitorCallback: TMonitorProc);
 begin
   FMonitorCallback := AMonitorCallback;
   Create(AConnection, ADriver);

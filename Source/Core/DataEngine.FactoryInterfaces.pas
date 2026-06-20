@@ -47,7 +47,7 @@ type
   end;
 
   // {$SCOPEDENUMS ON}
-  TDBEngineDriver = (dnMSSQL, dnMySQL, dnFirebird, dnSQLite, dnInterbase, dnDB2,
+  TDriverName = (dnMSSQL, dnMySQL, dnFirebird, dnSQLite, dnInterbase, dnDB2,
                      dnOracle, dnInformix, dnPostgreSQL, dnADS, dnASA,
                      dnFirebase, dnFirebird3, dnAbsoluteDB, dnMongoDB,
                      dnElevateDB, dnNexusDB, dnMariaDB, dnMemory);
@@ -375,7 +375,7 @@ type
     function BulkLoader: IDBBulkLoader;
     function GetSQLScripts: String;
     function RowsAffected: UInt32;
-    function GetDriver: TDBEngineDriver;
+    function GetDriver: TDriverName;
     function CommandMonitor: ICommandMonitor;
     function MonitorCallback: TMonitorProc;
     function Options: IOptions;
@@ -432,7 +432,7 @@ type
   end;
 
 const
-  TStrDBEngineDriver: array[TDBEngineDriver.dnMSSQL..TDBEngineDriver.dnMemory] of
+  TStrDriverName: array[TDriverName.dnMSSQL..TDriverName.dnMemory] of
                  string = ('MSSQL','MySQL','Firebird','SQLite','Interbase',
                            'DB2','Oracle','Informix','PostgreSQL','ADS','ASA',
                            'dnFirebase', 'dnFirebird3','AbsoluteDB','MongoDB',

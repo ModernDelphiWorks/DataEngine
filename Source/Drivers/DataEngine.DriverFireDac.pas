@@ -59,7 +59,7 @@ type
     function _IsAlive: Boolean; override;
   public
     constructor Create(const AConnection: TComponent; const ADriverTransaction: TDriverTransaction;
-      const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc;
+      const ADriver: TDriverName; const AMonitorCallback: TMonitorProc;
       const ACache: IDBCacheProvider = nil; const AMetadataCache: IDBMetadataCache = nil); override;
     destructor Destroy; override;
     procedure Connect; override;
@@ -85,7 +85,7 @@ type
   public
     constructor Create(const AConnection: TFDConnection;
       const ADriverTransaction: TDriverTransaction;
-      const AMonitorCallback: TMonitorProc; const ADriver: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc; const ADriver: TDriverName;
       const ACache: IDBCacheProvider = nil; const AMetadataCache: IDBMetadataCache = nil);
     destructor Destroy; override;
     procedure _InternalExecuteDirect; override;
@@ -146,7 +146,7 @@ begin
 end;
 
 constructor TDriverFireDAC.Create(const AConnection: TComponent; const ADriverTransaction: TDriverTransaction;
-  const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc;
+  const ADriver: TDriverName; const AMonitorCallback: TMonitorProc;
   const ACache: IDBCacheProvider; const AMetadataCache: IDBMetadataCache);
 begin
   inherited Create(AConnection, ADriverTransaction, ADriver, AMonitorCallback, ACache, AMetadataCache);
@@ -274,9 +274,9 @@ procedure TDriverFireDAC.AddScript(const AScript: String);
 var
   LSQLScript: TFDSQLScript;
 begin
-  if Self.GetDriver in [TDBEngineDriver.dnInterbase,
-                        TDBEngineDriver.dnFirebird,
-                        TDBEngineDriver.dnFirebird3] then
+  if Self.GetDriver in [TDriverName.dnInterbase,
+                        TDriverName.dnFirebird,
+                        TDriverName.dnFirebird3] then
   begin
     LSQLScript := FSQLScript.SQLScripts.Items[0];
     if LSQLScript.SQL.Count = 0 then
@@ -351,7 +351,7 @@ end;
 
 constructor TDriverQueryFireDAC.Create(const AConnection: TFDConnection;
   const ADriverTransaction: TDriverTransaction;
-  const AMonitorCallback: TMonitorProc; const ADriver: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc; const ADriver: TDriverName;
   const ACache: IDBCacheProvider; const AMetadataCache: IDBMetadataCache);
 begin
   if AConnection = nil then

@@ -26,21 +26,21 @@ uses
 type
   TMetadataCacheManager = class
   public
-    class function GenerateKey(const ATableName: string; const ADriver: TDBEngineDriver): string; static;
-    class function TryGetMetadata(const AMetadataCache: IDBMetadataCache; const ADriver: TDBEngineDriver; const ATableName: string; ADestination: TFieldDefs): Boolean; static;
-    class procedure SaveMetadata(const AMetadataCache: IDBMetadataCache; const ADriver: TDBEngineDriver; const ATableName: string; AFieldDefs: TFieldDefs); static;
+    class function GenerateKey(const ATableName: string; const ADriver: TDriverName): string; static;
+    class function TryGetMetadata(const AMetadataCache: IDBMetadataCache; const ADriver: TDriverName; const ATableName: string; ADestination: TFieldDefs): Boolean; static;
+    class procedure SaveMetadata(const AMetadataCache: IDBMetadataCache; const ADriver: TDriverName; const ATableName: string; AFieldDefs: TFieldDefs); static;
   end;
 
 implementation
 
 { TMetadataCacheManager }
 
-class function TMetadataCacheManager.GenerateKey(const ATableName: string; const ADriver: TDBEngineDriver): string;
+class function TMetadataCacheManager.GenerateKey(const ATableName: string; const ADriver: TDriverName): string;
 begin
   Result := THashMD5.GetHashString(IntToStr(Ord(ADriver)) + ':' + UpperCase(ATableName));
 end;
 
-class function TMetadataCacheManager.TryGetMetadata(const AMetadataCache: IDBMetadataCache; const ADriver: TDBEngineDriver; const ATableName: string; ADestination: TFieldDefs): Boolean;
+class function TMetadataCacheManager.TryGetMetadata(const AMetadataCache: IDBMetadataCache; const ADriver: TDriverName; const ATableName: string; ADestination: TFieldDefs): Boolean;
 var
   LJSON: string;
   LKey: string;
@@ -59,7 +59,7 @@ begin
   end;
 end;
 
-class procedure TMetadataCacheManager.SaveMetadata(const AMetadataCache: IDBMetadataCache; const ADriver: TDBEngineDriver; const ATableName: string; AFieldDefs: TFieldDefs);
+class procedure TMetadataCacheManager.SaveMetadata(const AMetadataCache: IDBMetadataCache; const ADriver: TDriverName; const ATableName: string; AFieldDefs: TFieldDefs);
 var
   LJSON: string;
   LKey: string;

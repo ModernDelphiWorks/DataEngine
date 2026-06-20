@@ -51,7 +51,7 @@ type
     procedure _InternalExecuteDirect(const ASQL: String; const AParams: TParams = nil); override;
   public
     constructor Create(const AConnection: TComponent; const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDBEngineDriver; const AMonitorCallback: TMonitorProc;
+      const ADriverName: TDriverName; const AMonitorCallback: TMonitorProc;
       const ACache: IDBCacheProvider = nil; const AMetadataCache: IDBMetadataCache = nil); override;
     destructor Destroy; override;
     procedure Connect; override;
@@ -74,7 +74,7 @@ type
   public
     constructor Create(const ADriverConnectionJSON: TDriverConnectionJSON;
       const ADriverTransaction: TDriverTransaction;
-      const AMonitorCallback: TMonitorProc; const ADriver: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc; const ADriver: TDriverName;
       const ACache: IDBCacheProvider = nil; const AMetadataCache: IDBMetadataCache = nil); reintroduce; virtual;
     procedure Prepare; override;
   end;
@@ -112,7 +112,7 @@ end;
 { TDriverConnectionJSON }
 
 constructor TDriverConnectionJSON.Create(const AConnection: TComponent;
-  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDriverName;
   const AMonitorCallback: TMonitorProc; const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
 begin
@@ -227,7 +227,7 @@ end;
 
 constructor TDriverQueryJSON.Create(const ADriverConnectionJSON: TDriverConnectionJSON;
   const ADriverTransaction: TDriverTransaction; const AMonitorCallback: TMonitorProc;
-  const ADriver: TDBEngineDriver; const ACache: IDBCacheProvider;
+  const ADriver: TDriverName; const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
 begin
   inherited Create(ADriverTransaction, AMonitorCallback, ADriver, ACache, AMetadataCache);

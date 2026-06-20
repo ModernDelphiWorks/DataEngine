@@ -49,7 +49,7 @@ type
     function BulkLoader: IDBBulkLoader; virtual;
     function GetSQLScripts: String; virtual;
     function RowsAffected: UInt32; virtual;
-    function GetDriver: TDBEngineDriver; virtual;
+    function GetDriver: TDriverName; virtual;
     function CommandMonitor: ICommandMonitor; virtual;
     function MonitorCallback: TMonitorProc; virtual;
     function Options: IOptions; virtual;
@@ -267,7 +267,7 @@ begin
   end;
 end;
 
-function TFactoryConnection.GetDriver: TDBEngineDriver;
+function TFactoryConnection.GetDriver: TDriverName;
 begin
   Result := FDriverConnection.GetDriver;
 end;

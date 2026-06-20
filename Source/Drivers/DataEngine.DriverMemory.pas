@@ -245,7 +245,7 @@ type
     function _GetTransactionActive: TComponent;
   public
     constructor Create(const AConnection: TComponent; const ADriverTransaction: TDriverTransaction;
-      const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc); override;
+      const ADriver: TDriverName; const AMonitorCallback: TMonitorProc); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
@@ -1494,7 +1494,7 @@ end;
 { TDriverMemory }
 
 constructor TDriverMemory.Create(const AConnection: TComponent;
-  const ADriverTransaction: TDriverTransaction; const ADriver: TDBEngineDriver;
+  const ADriverTransaction: TDriverTransaction; const ADriver: TDriverName;
   const AMonitorCallback: TMonitorProc);
 begin
   inherited Create(AConnection, ADriverTransaction, ADriver, AMonitorCallback);

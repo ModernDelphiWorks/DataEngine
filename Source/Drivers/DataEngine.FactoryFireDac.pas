@@ -27,10 +27,10 @@ type
   TFactoryFireDAC = class(TFactoryConnection)
   public
     constructor Create(const AConnection: TFDConnection;
-      const ADriver: TDBEngineDriver); overload;
-    constructor Create(const AConnection: TFDConnection; const ADriver: TDBEngineDriver;
+      const ADriver: TDriverName); overload;
+    constructor Create(const AConnection: TFDConnection; const ADriver: TDriverName;
       const AMonitor: ICommandMonitor); overload;
-    constructor Create(const AConnection: TFDConnection; const ADriver: TDBEngineDriver;
+    constructor Create(const AConnection: TFDConnection; const ADriver: TDriverName;
       const AMonitorCallback: TMonitorProc); overload;
     destructor Destroy; override;
     procedure AddTransaction(const AKey: String; const ATransaction: TComponent); override;
@@ -45,7 +45,7 @@ uses
 { TFactoryFireDAC }
 
 constructor TFactoryFireDAC.Create(const AConnection: TFDConnection;
-  const ADriver: TDBEngineDriver);
+  const ADriver: TDriverName);
 begin
   FDriverTransaction := TDriverFireDACTransaction.Create(AConnection, FMonitorCallback);
   FDriverConnection  := TDriverFireDAC.Create(AConnection,
@@ -56,7 +56,7 @@ begin
 end;
 
 constructor TFactoryFireDAC.Create(const AConnection: TFDConnection;
-  const ADriver: TDBEngineDriver; const AMonitor: ICommandMonitor);
+  const ADriver: TDriverName; const AMonitor: ICommandMonitor);
 begin
   FCommandMonitor := AMonitor;
   Create(AConnection, ADriver);
@@ -79,7 +79,7 @@ begin
 end;
 
 constructor TFactoryFireDAC.Create(const AConnection: TFDConnection;
-  const ADriver: TDBEngineDriver; const AMonitorCallback: TMonitorProc);
+  const ADriver: TDriverName; const AMonitorCallback: TMonitorProc);
 begin
   FMonitorCallback := AMonitorCallback;
   Create(AConnection, ADriver);

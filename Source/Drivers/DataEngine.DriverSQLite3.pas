@@ -34,7 +34,7 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitorCallback: TMonitorProc;
       const ACache: IDBCacheProvider = nil;
       const AMetadataCache: IDBMetadataCache = nil); override;
@@ -61,7 +61,7 @@ type
   public
     constructor Create(const AConnection: TSQLiteDatabase;
       const ADriverTransaction: TDriverTransaction;
-      const AMonitorCallback: TMonitorProc; const ADriver: TDBEngineDriver;
+      const AMonitorCallback: TMonitorProc; const ADriver: TDriverName;
       const ACache: IDBCacheProvider = nil;
       const AMetadataCache: IDBMetadataCache = nil);
     destructor Destroy; override;
@@ -115,7 +115,7 @@ uses
 { TDriverSQLite3 }
 
 constructor TDriverSQLite3.Create(const AConnection: TComponent;
-  const ADriverTransaction: TDriverTransaction; const ADriverName: TDBEngineDriver;
+  const ADriverTransaction: TDriverTransaction; const ADriverName: TDriverName;
   const AMonitorCallback: TMonitorProc; const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
 begin
@@ -223,7 +223,7 @@ end;
 
 constructor TDriverQuerySQLite3.Create(const AConnection: TSQLiteDatabase;
   const ADriverTransaction: TDriverTransaction;
-  const AMonitorCallback: TMonitorProc; const ADriver: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc; const ADriver: TDriverName;
   const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
 begin

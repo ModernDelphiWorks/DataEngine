@@ -43,7 +43,7 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitorCallback: TMonitorProc;
       const ACache: IDBCacheProvider = nil;
       const AMetadataCache: IDBMetadataCache = nil); override;
@@ -72,7 +72,7 @@ type
     constructor Create(const AConnection: TUniConnection;
       const ADriverTransaction: TDriverTransaction;
       const AMonitorCallback: TMonitorProc;
-      const ADriver: TDBEngineDriver;
+      const ADriver: TDriverName;
       const ACache: IDBCacheProvider = nil;
       const AMetadataCache: IDBMetadataCache = nil);
     destructor Destroy; override;
@@ -113,7 +113,7 @@ uses
 
 constructor TDriverUniDAC.Create(const AConnection: TComponent;
   const ADriverTransaction: TDriverTransaction;
-  const ADriverName: TDBEngineDriver;
+  const ADriverName: TDriverName;
   const AMonitorCallback: TMonitorProc;
   const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
@@ -274,7 +274,7 @@ end;
 
 constructor TDriverQueryUniDAC.Create(const AConnection: TUniConnection;
   const ADriverTransaction: TDriverTransaction;
-  const AMonitorCallback: TMonitorProc; const ADriver: TDBEngineDriver;
+  const AMonitorCallback: TMonitorProc; const ADriver: TDriverName;
   const ACache: IDBCacheProvider; const AMetadataCache: IDBMetadataCache);
 begin
   if AConnection = nil then

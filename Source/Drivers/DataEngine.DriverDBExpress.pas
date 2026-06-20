@@ -40,7 +40,7 @@ type
   public
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
-      const ADriverName: TDBEngineDriver;
+      const ADriverName: TDriverName;
       const AMonitorCallback: TMonitorProc;
       const ACache: IDBCacheProvider = nil;
       const AMetadataCache: IDBMetadataCache = nil); override;
@@ -69,7 +69,7 @@ type
     constructor Create(const AConnection: TSQLConnection;
       const ADriverTransaction: TDriverTransaction;
       const AMonitorCallback: TMonitorProc;
-      const ADriver: TDBEngineDriver;
+      const ADriver: TDriverName;
       const ACache: IDBCacheProvider = nil;
       const AMetadataCache: IDBMetadataCache = nil);
     destructor Destroy; override;
@@ -117,7 +117,7 @@ uses
 
 constructor TDriverDBExpress.Create(const AConnection: TComponent;
   const ADriverTransaction: TDriverTransaction;
-  const ADriverName: TDBEngineDriver;
+  const ADriverName: TDriverName;
   const AMonitorCallback: TMonitorProc;
   const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
@@ -264,7 +264,7 @@ end;
 constructor TDriverQueryDBExpress.Create(const AConnection: TSQLConnection;
   const ADriverTransaction: TDriverTransaction;
   const AMonitorCallback: TMonitorProc;
-  const ADriver: TDBEngineDriver;
+  const ADriver: TDriverName;
   const ACache: IDBCacheProvider;
   const AMetadataCache: IDBMetadataCache);
 begin

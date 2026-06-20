@@ -1,5 +1,5 @@
 {
-  "name": "DBEngine4D",
+  "name": "DataEngine",
   "description": "A flexible and modular database engine framework for Delphi applications",
   "version": "1.0.0",
   "homepage": "https://github.com/ModernDelphiWorks/DataEngine",

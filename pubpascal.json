@@ -1,6 +1,6 @@
 {
   "$schema": "https://www.pubdelphi.dev/schema/pubdelphi.schema.json",
-  "name": "DBEngine4D",
+  "name": "DataEngine",
   "version": "1.1.0",
   "kind": "runtime",
   "sources": ["./Source/"],

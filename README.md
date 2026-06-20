@@ -44,11 +44,11 @@ Windows-only pieces are guarded for non-Windows targets: the `MidasLib` (`TClien
 To install using the package manager [**Boss**](https://github.com/HashLoad/boss):
 
 ```sh
-boss install DBEngine4D
+boss install DataEngine
 ```
 
 > [!NOTE]
-> For historical registry reasons on Boss, the package name is declared as **DBEngine4D** in its manifest, but the official framework name is **DataEngine**.
+> For historical registry reasons on Boss, the package name is declared as **DataEngine** in its manifest, but the official framework name is **DataEngine**.
 
 ---
 
@@ -154,11 +154,11 @@ As partes Windows-only ficam guardadas para alvos não-Windows: o `MidasLib` (ru
 Para instalar usando o gerenciador de pacotes [**Boss**](https://github.com/HashLoad/boss):
 
 ```sh
-boss install DBEngine4D
+boss install DataEngine
 ```
 
 > [!NOTE]
-> Por motivos históricos de registro no Boss, o pacote é declarado como **DBEngine4D** no manifesto, embora o nome oficial do projeto seja **DataEngine**.
+> Por motivos históricos de registro no Boss, o pacote é declarado como **DataEngine** no manifesto, embora o nome oficial do projeto seja **DataEngine**.
 
 ---
 

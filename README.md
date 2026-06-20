@@ -182,7 +182,7 @@ begin
 end;
 ```
 
-#### 2. Execução Direta de Consulta
+#### 2. Execução Fluente de Consulta
 ```delphi
 var
   LQuery: IDBQuery;

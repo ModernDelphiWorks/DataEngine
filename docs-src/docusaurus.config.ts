@@ -2,8 +2,8 @@ import type { Config } from '@docusaurus/types';
 
 const config: Config = {
   title: 'DataEngine Docs',
-  url: 'https://example.com',
-  baseUrl: '/',
+  url: 'https://moderndelphiworks.github.io',
+  baseUrl: '/DataEngine/',
   favicon: 'img/favicon.ico',
   organizationName: 'ModernDelphiWorks',
   projectName: 'DataEngine',

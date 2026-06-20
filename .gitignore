@@ -86,3 +86,8 @@ local-readonly/
 # Boss package manager files
 !boss.json
 !boss-lock.json
+
+# Docusaurus (docs-src/) local artifacts
+docs-src/node_modules/
+docs-src/build/
+docs-src/.docusaurus/

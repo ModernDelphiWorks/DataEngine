@@ -7,6 +7,8 @@
 
 > 🔒 **Supply-chain transparency (CRA-ready):** a machine-readable **SBOM** (CycloneDX) is published on the package portal — [pubpascal.dev/packages/dataengine](https://www.pubpascal.dev/packages/dataengine) · security disclosure policy in **[SECURITY.md](SECURITY.md)** · changes tracked in **[CHANGELOG.md](CHANGELOG.md)**.
 
+📚 **[Documentation](https://moderndelphiworks.github.io/DataEngine/)**
+
 *   [🇬🇧 English](#-english)
 *   [🇧🇷 Português](#-português)
 

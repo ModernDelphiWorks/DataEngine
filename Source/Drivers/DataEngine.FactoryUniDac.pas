@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryUniDac;
 
+{$IFDEF DATAENGINE_DRIVER_UNIDAC}
+
 interface
 
 uses
@@ -85,8 +87,14 @@ begin
   inherited;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
 

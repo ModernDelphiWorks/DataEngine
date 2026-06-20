@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryElevateDB;
 
+{$IFDEF DATAENGINE_DRIVER_ELEVATEDB}
+
 interface
 
 uses
@@ -93,9 +95,14 @@ begin
   inherited AddTransaction(AKey, ATransaction);
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
-
 

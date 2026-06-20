@@ -13,6 +13,8 @@
 
 unit DataEngine.RedisTransport;
 
+{$IFDEF DATAENGINE_REDIS}
+
 interface
 
 uses
@@ -254,5 +256,13 @@ begin
     raise ERedisError.Create('Unexpected Redis response type: ' + Result.ValueType);
   end;
 end;
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
 
 end.

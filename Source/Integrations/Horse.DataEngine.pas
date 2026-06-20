@@ -207,7 +207,7 @@ begin
       try
         LSessionData := TDataEngineSession.Create(LConnection);
         try
-          Req.Session.AddOrSetValue('IDBConnection', LSessionData);
+          Req.Session<TDictionary<string, TObject>>.AddOrSetValue('IDBConnection', LSessionData);
 
           if Assigned(AConfig.OnConnectionAcquired) then
             AConfig.OnConnectionAcquired(Req, LConnection);
@@ -234,7 +234,7 @@ begin
               LConnection.Rollback;
               
           finally
-            Req.Session.Remove('IDBConnection');
+            Req.Session<TDictionary<string, TObject>>.Remove('IDBConnection');
           end;
         finally
           LSessionData.Free;
@@ -265,7 +265,7 @@ var
   LObj: TObject;
 begin
   Result := nil;
-  if Session.TryGetValue('IDBConnection', LObj) and (LObj is TDataEngineSession) then
+  if Session<TDictionary<string, TObject>>.TryGetValue('IDBConnection', LObj) and (LObj is TDataEngineSession) then
     Result := TDataEngineSession(LObj).Connection;
 end;
 

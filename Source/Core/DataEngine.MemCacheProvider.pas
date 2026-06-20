@@ -19,6 +19,7 @@ uses
   SysUtils,
   Classes,
   Generics.Collections,
+  Generics.Defaults,
   DataEngine.FactoryInterfaces,
   DataEngine.CacheTypes;
 
@@ -52,7 +53,16 @@ constructor TMemCacheProvider.Create;
 begin
   inherited Create;
   FItems := TObjectDictionary<string, IDBDataSetSnapshot>.Create([doOwnsValues]);
-  FTableMap := TObjectDictionary<string, TList<string>>.Create([doOwnsValues], TStringComparer.OrdinalIgnoreCase);
+  FTableMap := TObjectDictionary<string, TList<string>>.Create([doOwnsValues],
+    TEqualityComparer<string>.Construct(
+      function(const ALeft, ARight: string): Boolean
+      begin
+        Result := SameText(ALeft, ARight);
+      end,
+      function(const AValue: string): Integer
+      begin
+        Result := TEqualityComparer<string>.Default.GetHashCode(UpperCase(AValue));
+      end));
   FHitCount := 0;
   FMissCount := 0;
 end;

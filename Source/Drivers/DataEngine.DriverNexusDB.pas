@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverNexusDB;
 
+{$IFDEF DATAENGINE_DRIVER_NEXUSDB}
+
 interface
 
 uses
@@ -479,6 +481,13 @@ begin
   Result := FDataSet.UniDirectional;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

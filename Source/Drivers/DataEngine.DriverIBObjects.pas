@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverIBObjects;
 
+{$IFDEF DATAENGINE_DRIVER_IBOBJECTS}
+
 interface
 
 uses
@@ -400,6 +402,13 @@ begin
   inherited Create(ADataSet, AMonitorCallback);
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

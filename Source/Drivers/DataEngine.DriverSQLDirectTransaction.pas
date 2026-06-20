@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverSQLDirectTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_SQLDIRECT}
+
 interface
 
 uses
@@ -90,7 +92,13 @@ begin
     FConnection.Rollback;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

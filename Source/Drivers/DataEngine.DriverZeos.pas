@@ -17,6 +17,8 @@ unit DataEngine.DriverZeos;
   {$mode delphi}{$H+}
 {$endif}
 
+{$IFDEF DATAENGINE_DRIVER_ZEOS}
+
 interface
 
 uses
@@ -573,7 +575,13 @@ begin
   FDataSet.Properties.Values['FetchSize'] := Value.BatchSize.ToString;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

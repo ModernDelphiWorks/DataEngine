@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverUniDac;
 
+{$IFDEF DATAENGINE_DRIVER_UNIDAC}
+
 interface
 
 uses
@@ -500,6 +502,13 @@ begin
     FDataSet.SpecificOptions.Values['FetchAll'] := 'True';
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

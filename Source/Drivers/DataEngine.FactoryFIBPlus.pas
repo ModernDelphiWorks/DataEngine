@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryFIBPlus;
 
+{$IFDEF DATAENGINE_DRIVER_FIBPLUS}
+
 interface
 
 uses
@@ -87,9 +89,14 @@ begin
   inherited;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
-
 

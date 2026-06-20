@@ -13,6 +13,9 @@
 
 unit DataEngine.FactoryJSON;
 
+// Optional experimental JSON-file driver (incomplete). Enable with DATAENGINE_DRIVER_JSON.
+{$IFDEF DATAENGINE_DRIVER_JSON}
+
 interface
 
 uses
@@ -67,5 +70,10 @@ begin
   FInternalConnection.Free;
   inherited;
 end;
+
+{$ELSE}
+interface
+implementation
+{$ENDIF}
 
 end.

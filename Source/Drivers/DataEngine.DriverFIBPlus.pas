@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverFIBPlus;
 
+{$IFDEF DATAENGINE_DRIVER_FIBPLUS}
+
 interface
 
 uses
@@ -423,6 +425,13 @@ begin
   Result := 0; // FIBDataSet does not easily expose rows affected for select
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

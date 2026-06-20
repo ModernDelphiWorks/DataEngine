@@ -13,6 +13,8 @@
 
 unit DataEngine.SQLiteCacheProvider;
 
+{$IFDEF DATAENGINE_SQLITE_CACHE}
+
 interface
 
 uses
@@ -34,7 +36,7 @@ type
   public
     constructor Create(const ADatabasePath: string = 'dataengine_cache.db');
     destructor Destroy; override;
-    
+
     procedure SetValue(const AKey: string; const ADataSet: IDBDataSetSnapshot; const ATTL: Integer = 0; const ATables: TArray<string> = nil);
     function GetValue(const AKey: string): IDBDataSetSnapshot;
     procedure Clear;
@@ -43,7 +45,7 @@ type
     function Count: Integer;
     function HitCount: Integer;
     function MissCount: Integer;
-    
+
     procedure Prune;
 
     // IDBMetadataCache
@@ -64,10 +66,10 @@ begin
   inherited Create;
   FDatabasePath := ADatabasePath;
   FDB := TSQLiteDatabase.Create(ADatabasePath);
-  
+
   FHitCount := 0;
   FMissCount := 0;
-  
+
   _EnsureTable;
 end;
 
@@ -88,7 +90,7 @@ begin
     ')'
   );
   FDB.ExecSQL('CREATE INDEX IF NOT EXISTS IDX_CacheStore_ExpireAt ON CacheStore(ExpireAt)');
-  
+
   FDB.ExecSQL(
     'CREATE TABLE IF NOT EXISTS CacheTableMapping (' +
     '  Key TEXT,' +
@@ -110,7 +112,7 @@ begin
   if LTTL <= 0 then
     LTTL := 30; // 30 minutes fallback
 
-  LExpireAt := Now + (LTTL / (24 * 60)); 
+  LExpireAt := Now + (LTTL / (24 * 60));
 
   LStream := TMemoryStream.Create;
   try
@@ -119,7 +121,7 @@ begin
       TCacheManager.SerializeToStream(ADataSet, LStream);
       LStream.Position := 0;
     end;
-    
+
     LStmt := FDB.GetPreparedStatementIntf('INSERT OR REPLACE INTO CacheStore (Key, Data, ExpireAt) VALUES (:Key, :Data, :ExpireAt)');
     LStmt.SetParamText(':Key', AKey);
     if LStream.Size > 0 then
@@ -128,11 +130,11 @@ begin
       LStmt.SetParamNull(':Data');
     LStmt.SetParamDateTime(':ExpireAt', LExpireAt);
     LStmt.ExecSQL;
-    
+
     if Length(ATables) > 0 then
     begin
        FDB.ExecSQL('DELETE FROM CacheTableMapping WHERE Key = ' + QuotedStr(AKey));
-       
+
        LStmt := FDB.GetPreparedStatementIntf('INSERT INTO CacheTableMapping (Key, TableName) VALUES (:Key, :TableName)');
        for LTable in ATables do
        begin
@@ -151,7 +153,7 @@ var
   LTable: TSQLiteTable;
   LStream: TMemoryStream;
 begin
-  LTable := FDB.GetTable('SELECT Data FROM CacheStore WHERE Key = ' + QuotedStr(AKey) + 
+  LTable := FDB.GetTable('SELECT Data FROM CacheStore WHERE Key = ' + QuotedStr(AKey) +
     ' AND (ExpireAt IS NULL OR ExpireAt > ' + FloatToStr(Now) + ')');
   try
     if not LTable.EOF then
@@ -202,7 +204,7 @@ begin
       Evict(LTable.Fields[0]);
       LTable.Next;
     end;
-    
+
     // Clear mapping for this table
     FDB.ExecSQL('DELETE FROM CacheTableMapping WHERE TableName = ' + QuotedStr(ATableName));
   finally
@@ -254,7 +256,7 @@ var
   LTable: TSQLiteTable;
 begin
   Result := string.Empty;
-  LTable := FDB.GetTable('SELECT MetaData FROM CacheStore WHERE Key = ' + QuotedStr('META:' + AKey) + 
+  LTable := FDB.GetTable('SELECT MetaData FROM CacheStore WHERE Key = ' + QuotedStr('META:' + AKey) +
     ' AND (ExpireAt IS NULL OR ExpireAt > ' + FloatToStr(Now) + ')');
   try
     if not LTable.EOF then
@@ -268,5 +270,13 @@ begin
     LTable.Free;
   end;
 end;
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
 
 end.

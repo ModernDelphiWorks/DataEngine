@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverSQLDB;
 
+{$IFDEF DATAENGINE_DRIVER_SQLDB}
+
 interface
 
 uses
@@ -419,6 +421,13 @@ begin
   inherited Create(ADataSet, AMonitorCallback);
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

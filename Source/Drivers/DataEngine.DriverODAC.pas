@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverODAC;
 
+{$IFDEF DATAENGINE_DRIVER_ODAC}
+
 interface
 
 uses
@@ -422,6 +424,13 @@ begin
   Result := FDataSet.RowsAffected;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

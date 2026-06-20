@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverFireDacMongoDB;
 
+{$IFDEF DATAENGINE_DRIVER_FIREDACMONGODB}
+
 interface
 
 uses
@@ -400,6 +402,13 @@ begin
   Result := 0;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

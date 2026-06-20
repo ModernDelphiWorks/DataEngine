@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverAbsoluteDB;
 
+{$IFDEF DATAENGINE_DRIVER_ABSOLUTEDB}
+
 interface
 
 uses
@@ -390,6 +392,13 @@ begin
   inherited Create(ADataSet, AMonitorCallback);
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

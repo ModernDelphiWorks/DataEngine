@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverADO;
 
+{$IFDEF DATAENGINE_DRIVER_ADO}
+
 interface
 
 uses
@@ -549,6 +551,13 @@ begin
   FDataSet.SQL.Text := ACommandText;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

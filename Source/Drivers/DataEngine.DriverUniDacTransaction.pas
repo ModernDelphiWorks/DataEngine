@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverUniDacTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_UNIDAC}
+
 interface
 
 uses
@@ -101,6 +103,14 @@ function TDriverUniDACTransaction._InTransaction: Boolean;
 begin
   Result := (FTransactionActive as TUniTransaction).Active;
 end;
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
 
 end.
 

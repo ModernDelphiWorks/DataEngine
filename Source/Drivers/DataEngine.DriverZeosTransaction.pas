@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverZeosTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_ZEOS}
+
 interface
 
 uses
@@ -137,6 +139,13 @@ begin
   {$ENDIF}
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryNexusDB;
 
+{$IFDEF DATAENGINE_DRIVER_NEXUSDB}
+
 interface
 
 uses
@@ -87,9 +89,14 @@ begin
   inherited;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
-
 

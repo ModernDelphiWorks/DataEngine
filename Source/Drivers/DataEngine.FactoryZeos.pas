@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryZeos;
 
+{$IFDEF DATAENGINE_DRIVER_ZEOS}
+
 interface
 
 uses
@@ -90,8 +92,14 @@ begin
   inherited AddTransaction(AKey, ATransaction);
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
 

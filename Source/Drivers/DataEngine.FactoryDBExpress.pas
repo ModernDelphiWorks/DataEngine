@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryDBExpress;
 
+{$IFDEF DATAENGINE_DRIVER_DBEXPRESS}
+
 interface
 
 uses
@@ -84,9 +86,14 @@ begin
   Create(AConnection, ADriver);
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
-
 

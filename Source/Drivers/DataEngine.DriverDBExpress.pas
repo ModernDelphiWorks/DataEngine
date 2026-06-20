@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverDBExpress;
 
+{$IFDEF DATAENGINE_DRIVER_DBEXPRESS}
+
 interface
 
 uses
@@ -600,7 +602,13 @@ begin
   end;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

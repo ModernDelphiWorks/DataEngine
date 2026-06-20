@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverFIBPlusTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_FIBPLUS}
+
 interface
 
 uses
@@ -107,7 +109,13 @@ begin
   (FTransactionActive as TFIBTransaction).Rollback;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

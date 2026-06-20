@@ -13,6 +13,9 @@
 
 unit DataEngine.DriverMemoryTransaction;
 
+// Optional in-memory driver (depends on System.Fluent, absent on minimal Linux SDK). Enable with DATAENGINE_DRIVER_MEMORY.
+{$IFDEF DATAENGINE_DRIVER_MEMORY}
+
 interface
 
 uses
@@ -78,6 +81,11 @@ function TDriverMemoryTransaction._InTransaction: Boolean;
 begin
   Result := FConnection.InTransaction;
 end;
+
+{$ELSE}
+interface
+implementation
+{$ENDIF}
 
 end.
 

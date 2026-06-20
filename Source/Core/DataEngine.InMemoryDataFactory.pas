@@ -31,11 +31,12 @@ type
 implementation
 
 uses
-  Datasnap.DBClient, Datasnap.Provider;
+  FireDAC.Comp.Client,
+  FireDAC.Comp.DataSet;
 
 class function TInMemoryDataFactory.CreateDataSet(AOwner: TComponent): TDataSet;
 begin
-  Result := TClientDataSet.Create(AOwner);
+  Result := TFDMemTable.Create(AOwner);
 end;
 
 class function TInMemoryDataFactory.CloneDataSet(ASource: TDataSet): TDataSet;
@@ -55,30 +56,28 @@ end;
 
 class function TInMemoryDataFactory.CreateFromDataSet(ASource: TDataSet): TDataSet;
 var
-  LProvider: TDataSetProvider;
-  LTargetCDS: TClientDataSet;
+  LTarget: TFDMemTable;
 begin
-  LTargetCDS := TClientDataSet.Create(nil);
-  LProvider := TDataSetProvider.Create(nil);
+  LTarget := TFDMemTable.Create(nil);
   try
-    LProvider.DataSet := ASource;
-    LTargetCDS.Data := LProvider.Data;
-    Result := LTargetCDS;
-  finally
-    LProvider.Free;
+    LTarget.CopyDataSet(ASource, [coStructure, coRestart, coAppend]);
+    Result := LTarget;
+  except
+    LTarget.Free;
+    raise;
   end;
 end;
 
 class procedure TInMemoryDataFactory.SaveToStream(ASource: TDataSet; AStream: TStream);
 begin
-  if ASource is TClientDataSet then
-    TClientDataSet(ASource).SaveToStream(AStream);
+  if ASource is TFDMemTable then
+    TFDMemTable(ASource).SaveToStream(AStream);
 end;
 
 class procedure TInMemoryDataFactory.LoadFromStream(ATarget: TDataSet; AStream: TStream);
 begin
-  if ATarget is TClientDataSet then
-    TClientDataSet(ATarget).LoadFromStream(AStream);
+  if ATarget is TFDMemTable then
+    TFDMemTable(ATarget).LoadFromStream(AStream);
 end;
 
 end.

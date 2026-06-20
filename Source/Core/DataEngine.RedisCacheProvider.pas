@@ -13,6 +13,8 @@
 
 unit DataEngine.RedisCacheProvider;
 
+{$IFDEF DATAENGINE_REDIS}
+
 interface
 
 uses
@@ -234,7 +236,7 @@ var
   LTTLSeconds: Integer;
 begin
   FTransport.ExecuteCommand('SET', [_GetMetaKey(AKey), AJSON]);
-  
+
   LTTLSeconds := ATTL * 60;
   if LTTLSeconds <= 0 then
     LTTLSeconds := 1440 * 60; // 24h default for metadata
@@ -253,5 +255,13 @@ begin
   else
     Inc(FMissCount);
 end;
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
 
 end.

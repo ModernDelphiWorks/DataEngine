@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverAbsoluteDBTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_ABSOLUTEDB}
+
 interface
 
 uses
@@ -90,7 +92,13 @@ begin
     FConnection.Rollback;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

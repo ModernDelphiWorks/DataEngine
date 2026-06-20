@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverSQLite3Transaction;
 
+{$IFDEF DATAENGINE_DRIVER_SQLITE3}
+
 interface
 
 uses
@@ -89,6 +91,14 @@ begin
   if FConnection.IsTransactionOpen then
     FConnection.Rollback;
 end;
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
 
 end.
 

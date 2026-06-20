@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverODACTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_ODAC}
+
 interface
 
 uses
@@ -78,7 +80,13 @@ begin
   FConnection.Rollback;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

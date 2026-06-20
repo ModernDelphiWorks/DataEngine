@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverNexusDBTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_NEXUSDB}
+
 interface
 
 uses
@@ -78,7 +80,13 @@ begin
   FConnection.Rollback;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

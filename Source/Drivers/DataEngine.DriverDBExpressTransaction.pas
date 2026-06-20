@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverDBExpressTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_DBEXPRESS}
+
 interface
 
 uses
@@ -146,7 +148,13 @@ begin
   Result := FConnection.InTransaction;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

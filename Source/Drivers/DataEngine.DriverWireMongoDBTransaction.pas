@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverWireMongoDBTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_WIREMONGODB}
+
 interface
 
 uses
@@ -89,6 +91,14 @@ begin
 
   // No-op for MongoWire wrapper
 end;
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
 
 end.
 

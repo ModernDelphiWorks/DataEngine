@@ -13,6 +13,8 @@
 
 unit DataEngine.PoolCoordinator.Redis;
 
+{$IFDEF DATAENGINE_REDIS}
+
 interface
 
 uses
@@ -143,7 +145,7 @@ begin
       // If we use Sentinels and don't have a master yet, discover it
       if (FEndpoints.Count > 0) and (FCurrentMasterHost = '') then
         _DiscoverMaster;
-        
+
       Result := AFunc();
       Exit;
     except
@@ -174,7 +176,7 @@ end;
 
 function TRedisPoolCoordinator.AcquireSlot(const ATenantID: string; const AMaxSlots: Integer; const ATimeout: Integer; out ASlotToken: string): Boolean;
 const
-  LScript = 
+  LScript =
     'local key = KEYS[1] ' +
     'local member = ARGV[1] ' +
     'local now = tonumber(ARGV[2]) ' +
@@ -199,7 +201,7 @@ var
 begin
   LKey := 'DataEngine:Pool:Slots:' + ATenantID;
   LToken := FNodeID + ':' + TGuid.NewGuid.ToString.Replace('{', '').Replace('}', '');
-  
+
   try
     LRes := ExecuteWithRetry(function: string
       begin
@@ -213,13 +215,13 @@ begin
     else
       Result := False;
   except
-    Result := False; 
+    Result := False;
   end;
 end;
 
 function TRedisPoolCoordinator.RefreshSlot(const ATenantID: string; const ASlotToken: string): Boolean;
 const
-  LScript = 
+  LScript =
     'local key = KEYS[1] ' +
     'local member = ARGV[1] ' +
     'local now = tonumber(ARGV[2]) ' +
@@ -270,7 +272,7 @@ end;
 
 function TRedisPoolCoordinator.GetGlobalMetrics(const ATenantID: string): TPoolMetrics;
 const
-  LScript = 
+  LScript =
     'local key = KEYS[1] ' +
     'local now = tonumber(ARGV[1]) ' +
     'local ttl = tonumber(ARGV[2]) ' +
@@ -297,5 +299,13 @@ function TRedisPoolCoordinator.GetSlotTTL: Integer;
 begin
   Result := FTTL;
 end;
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
 
 end.

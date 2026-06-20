@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverSQLite3;
 
+{$IFDEF DATAENGINE_DRIVER_SQLITE3}
+
 interface
 
 uses
@@ -506,6 +508,13 @@ begin
   end;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverSQLDirect;
 
+{$IFDEF DATAENGINE_DRIVER_SQLDIRECT}
+
 interface
 
 uses
@@ -478,6 +480,13 @@ begin
   FDataSet.SQL.Text := ACommandText;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

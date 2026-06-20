@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryADO;
 
+{$IFDEF DATAENGINE_DRIVER_ADO}
+
 interface
 
 uses
@@ -88,9 +90,14 @@ begin
   inherited;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
-
 

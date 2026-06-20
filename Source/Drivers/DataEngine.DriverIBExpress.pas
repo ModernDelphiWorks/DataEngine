@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverIBExpress;
 
+{$IFDEF DATAENGINE_DRIVER_IBEXPRESS}
+
 interface
 
 uses
@@ -481,6 +483,13 @@ begin
   Result := FDataSet.UniDirectional;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

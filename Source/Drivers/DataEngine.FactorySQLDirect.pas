@@ -13,6 +13,8 @@
 
 unit DataEngine.FactorySQLDirect;
 
+{$IFDEF DATAENGINE_DRIVER_SQLDIRECT}
+
 interface
 
 uses
@@ -93,9 +95,14 @@ begin
   inherited AddTransaction(AKey, ATransaction);
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
-
 

@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverUniDacBulkLoader;
 
+{$IFDEF DATAENGINE_DRIVER_UNIDAC}
+
 interface
 
 uses
@@ -107,5 +109,14 @@ begin
     FBuffer[LKey] := LColArr; // TArray is a pointer but we need to ensure the reference if needed, although usually not necessary for TArray.
   end;
 end;
+
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
 
 end.

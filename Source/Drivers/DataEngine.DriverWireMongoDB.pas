@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverWireMongoDB;
 
+{$IFDEF DATAENGINE_DRIVER_WIREMONGODB}
+
 interface
 
 uses
@@ -456,6 +458,13 @@ begin
   FConnection := AConnection;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-

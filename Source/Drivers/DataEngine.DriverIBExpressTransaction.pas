@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverIBExpressTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_IBEXPRESS}
+
 interface
 
 uses
@@ -105,7 +107,13 @@ begin
   Result := (FTransactionActive as TIBTransaction).InTransaction;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

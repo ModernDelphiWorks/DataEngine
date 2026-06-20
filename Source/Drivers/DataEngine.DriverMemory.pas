@@ -13,6 +13,9 @@
 
 unit DataEngine.DriverMemory;
 
+// Optional in-memory driver (depends on System.Fluent, absent on minimal Linux SDK). Enable with DATAENGINE_DRIVER_MEMORY.
+{$IFDEF DATAENGINE_DRIVER_MEMORY}
+
 interface
 
 uses
@@ -1814,6 +1817,11 @@ procedure TDriverDataSetMemory._SetCachedUpdates(const Value: Boolean);
 begin
   // No-op for Memory driver
 end;
+
+{$ELSE}
+interface
+implementation
+{$ENDIF}
 
 end.
 

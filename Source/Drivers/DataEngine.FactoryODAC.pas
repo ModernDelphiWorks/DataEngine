@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryODAC;
 
+{$IFDEF DATAENGINE_DRIVER_ODAC}
+
 interface
 
 uses
@@ -87,9 +89,14 @@ begin
   inherited;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
-
 

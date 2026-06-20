@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverFireDacMongoDBTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_FIREDACMONGODB}
+
 interface
 
 uses
@@ -80,6 +82,9 @@ begin
   FConnection.Rollback;
 end;
 
+{$ELSE}
+interface
+implementation
+{$ENDIF}
+
 end.
-
-

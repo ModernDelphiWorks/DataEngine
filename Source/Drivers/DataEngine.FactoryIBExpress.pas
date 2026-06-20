@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryIBExpress;
 
+{$IFDEF DATAENGINE_DRIVER_IBEXPRESS}
+
 interface
 
 uses
@@ -85,9 +87,14 @@ begin
   inherited;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
-
 

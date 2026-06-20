@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverADOTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_ADO}
+
 interface
 
 uses
@@ -79,7 +81,13 @@ begin
   FConnection.RollbackTrans;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

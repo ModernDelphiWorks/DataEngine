@@ -39,12 +39,14 @@ type
 
   TConnectionGuardBuilder = class
   private
+    FTenantID: string;
     FMaxConnections: Integer;
     FConnectionLifeCycle: Integer;
     FConnectionFactory: TFunc<IDBConnection>;
     FResiliencePolicy: IDBResiliencePolicy;
     class var FGuardConnection: TGuardConnection;
   public
+    function TenantID(const AValue: string): TConnectionGuardBuilder;
     function Limit(const AValue: Integer): TConnectionGuardBuilder;
     function LifeCycle(const AValue: Integer): TConnectionGuardBuilder;
     function WithFactory(const AFactory: TFunc<IDBConnection>): TConnectionGuardBuilder;
@@ -70,9 +72,15 @@ end;
 { TConnectionGuard }
 
 constructor TGuardConnection.Create(const ABuilder: TConnectionGuardBuilder);
+var
+  LTenantID: string;
 begin
   FResiliencePolicy := ABuilder.FResiliencePolicy;
-  FPool := TPoolConnection.Create(ABuilder.FMaxConnections,
+  LTenantID := ABuilder.FTenantID;
+  if LTenantID = '' then
+    LTenantID := 'default';
+  FPool := TPoolConnection.Create(LTenantID,
+                                  ABuilder.FMaxConnections,
                                   ABuilder.FConnectionLifeCycle,
                                   ABuilder.FConnectionFactory);
 end;
@@ -136,6 +144,12 @@ begin
 end;
 
 { TConnectionGuardBuilder }
+
+function TConnectionGuardBuilder.TenantID(const AValue: string): TConnectionGuardBuilder;
+begin
+  FTenantID := AValue;
+  Result := Self;
+end;
 
 function TConnectionGuardBuilder.Limit(const AValue: Integer): TConnectionGuardBuilder;
 begin

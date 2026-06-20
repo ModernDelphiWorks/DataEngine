@@ -13,6 +13,8 @@
 
 unit DataEngine.FactoryFireDACMongoDB;
 
+{$IFDEF DATAENGINE_DRIVER_FIREDACMONGODB}
+
 interface
 
 uses
@@ -87,8 +89,14 @@ begin
   inherited;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-
 

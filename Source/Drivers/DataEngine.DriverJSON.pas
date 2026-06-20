@@ -13,6 +13,9 @@
 
 unit DataEngine.DriverJSON;
 
+// Optional experimental JSON-file driver (incomplete). Enable with DATAENGINE_DRIVER_JSON.
+{$IFDEF DATAENGINE_DRIVER_JSON}
+
 interface
 
 uses
@@ -45,6 +48,7 @@ type
   private
     FJSONData: TJSONArray;
     FLock: TCriticalSection;
+    FConnection: TComponent;
     procedure _LoadFromFile;
     procedure _SaveToFile;
   protected
@@ -117,6 +121,7 @@ constructor TDriverConnectionJSON.Create(const AConnection: TComponent;
   const AMetadataCache: IDBMetadataCache);
 begin
   inherited Create(AConnection, ADriverTransaction, ADriverName, AMonitorCallback, ACache, AMetadataCache);
+  FConnection := AConnection;
   FLock := TCriticalSection.Create;
   FJSONData := nil;
 end;
@@ -339,5 +344,10 @@ begin
     FDataSet.Post;
   end;
 end;
+
+{$ELSE}
+interface
+implementation
+{$ENDIF}
 
 end.

@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverSQLDBTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_SQLDB}
+
 interface
 
 uses
@@ -108,7 +110,13 @@ begin
     (FTransactionActive as TSQLTransaction).Rollback;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

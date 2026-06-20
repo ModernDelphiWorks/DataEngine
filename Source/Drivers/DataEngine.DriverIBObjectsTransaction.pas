@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverIBObjectsTransaction;
 
+{$IFDEF DATAENGINE_DRIVER_IBOBJECTS}
+
 interface
 
 uses
@@ -94,7 +96,13 @@ begin
     FConnection.DefaultTransaction.Rollback;
 end;
 
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
+
 end.
-
-
-

@@ -13,6 +13,8 @@
 
 unit DataEngine.DriverZeosBulkLoader;
 
+{$IFDEF DATAENGINE_DRIVER_ZEOS}
+
 interface
 
 uses
@@ -136,5 +138,14 @@ begin
     FBuffer[LKey] := LColArr;
   end;
 end;
+
+
+{$ELSE}
+
+interface
+
+implementation
+
+{$ENDIF}
 
 end.

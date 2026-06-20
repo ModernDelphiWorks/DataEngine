@@ -13,6 +13,9 @@
 
 unit DataEngine.FactoryMemory;
 
+// Optional in-memory driver (depends on System.Fluent, absent on minimal Linux SDK). Enable with DATAENGINE_DRIVER_MEMORY.
+{$IFDEF DATAENGINE_DRIVER_MEMORY}
+
 interface
 
 uses
@@ -81,6 +84,11 @@ procedure TFactoryMemory.AddTransaction(const AKey: String;
 begin
   inherited AddTransaction(AKey, ATransaction);
 end;
+
+{$ELSE}
+interface
+implementation
+{$ENDIF}
 
 end.
 

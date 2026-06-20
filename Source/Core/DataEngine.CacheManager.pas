@@ -41,7 +41,9 @@ implementation
 uses
   DataEngine.DataSetSnapshot,
   DataEngine.InMemoryDataFactory,
-  MidasLib,
+  {$IFDEF MSWINDOWS}
+  MidasLib,   // statically links midas.dll (TClientDataSet runtime), Windows-only; Epic 25 Linux guard
+  {$ENDIF}
   System.RegularExpressions;
 
 { TCacheManager }

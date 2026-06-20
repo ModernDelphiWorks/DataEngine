@@ -52,8 +52,6 @@ To install using the package manager [**Boss**](https://github.com/HashLoad/boss
 boss install DataEngine
 ```
 
-> [!NOTE]
-> For historical registry reasons on Boss, the package name is declared as **DataEngine** in its manifest, but the official framework name is **DataEngine**.
 
 ---
 

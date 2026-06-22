@@ -571,12 +571,22 @@ end;
 procedure TDriverDataSetFireDAC.Open;
 var
   LParams: TParams;
+  LTxnName: string;
 begin
+  LParams := nil;
   try
     inherited Open;
     LParams := FDataSet.AsParams;
   finally
-    _SetMonitorLog(FDataSet.SQL.Text, FDataSet.Transaction.Name, LParams);
+    // An autonomous read (no active shared transaction) leaves FDataSet.Transaction
+    // nil — FireDAC self-manages the statement. Guard the monitor-log against the nil
+    // deref (FDataSet.Transaction.Name => "Read of address 00000008"); mirrors the
+    // same nil-transaction guard already used in _InternalExecuteQuery.
+    if Assigned(FDataSet.Transaction) then
+      LTxnName := FDataSet.Transaction.Name
+    else
+      LTxnName := '(no transaction)';
+    _SetMonitorLog(FDataSet.SQL.Text, LTxnName, LParams);
     if Assigned(LParams) then
     begin
       LParams.Clear;

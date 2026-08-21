@@ -35,7 +35,9 @@ type
     constructor Create(const AConnection: TComponent;
       const ADriverTransaction: TDriverTransaction;
       const ADriverName: TDriverName;
-      const AMonitorCallback: TMonitorProc); override;
+      const AMonitorCallback: TMonitorProc;
+      const ACache: IDBCacheProvider = nil;
+      const AMetadataCache: IDBMetadataCache = nil); override;
     destructor Destroy; override;
     procedure Connect; override;
     procedure Disconnect; override;
@@ -95,8 +97,11 @@ implementation
 
 constructor TDriverSQLDirect.Create(const AConnection: TComponent;
   const ADriverTransaction: TDriverTransaction; const ADriverName: TDriverName;
-  const AMonitorCallback: TMonitorProc);
+  const AMonitorCallback: TMonitorProc;
+  const ACache: IDBCacheProvider;
+  const AMetadataCache: IDBMetadataCache);
 begin
+  inherited;
   FConnection := AConnection as TSDDatabase;
   FDriverTransaction := ADriverTransaction;
   FDriver := ADriverName;

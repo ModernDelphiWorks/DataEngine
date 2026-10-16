@@ -6,6 +6,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Fixed
+- **Params leak (FireDAC, ADO, Zeos)**: `IDBQuery.Params` returned a new `TParams` on every read (`AsParams`) and nobody freed it; the core reads it for the monitor and the cache on every command, so each SQL leaked one `TParams`. The query now owns one `TParams` (the one `TDriverQuery` already frees) and each read refreshes it (Issue #58).
+
 ## [1.0.0] - 2026-04-10
 
 ### Added

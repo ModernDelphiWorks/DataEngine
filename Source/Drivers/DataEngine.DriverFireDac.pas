@@ -482,10 +482,19 @@ begin
 end;
 
 function TDriverQueryFireDAC._GetParams: TParams;
+var
+  LSnapshot: TParams;
 begin
-  // Note: This helper creates a new instance. Consumer must manage it or we need a persistent cache.
-  // For now, to allow compilation and basic tests.
-  Result := FFDQuery.AsParams;
+  // The copy of the native params lives in the TParams owned by TDriverQuery, which frees it in its
+  // destructor; each read refreshes its content. Returning AsParams directly created a new TParams on
+  // every read (the core reads Params for the monitor and the cache on every command) and nobody freed it.
+  Result := inherited _GetParams;
+  LSnapshot := FFDQuery.AsParams;
+  try
+    Result.Assign(LSnapshot);
+  finally
+    LSnapshot.Free;
+  end;
 end;
 
 function TDriverQueryFireDAC._GetTransactionActive: TFDTransaction;

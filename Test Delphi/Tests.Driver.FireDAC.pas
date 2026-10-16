@@ -64,6 +64,8 @@ type
     [Test]
     procedure TestCreateQuery;
     [Test]
+    procedure TestQueryParamsIsOwnedByTheQuery;
+    [Test]
     procedure TestCreateDataSet;
     [Test]
     procedure TestStartTransaction;
@@ -224,6 +226,27 @@ begin
   LValue := FDBQuery.ExecuteQuery.FieldByName('CLIENT_NAME').AsString;
 
   Assert.AreEqual(LValue, cDESCRIPTION + LRandon, LValue + ' <> ' + cDESCRIPTION + LRandon);
+end;
+
+procedure TTestDriverConnection.TestQueryParamsIsOwnedByTheQuery;
+var
+  LFirst: TParams;
+  LSecond: TParams;
+begin
+  // Params used to return a NEW TParams on every read, and nobody freed it: the core reads it for
+  // the monitor and the cache on every command, so each SQL leaked one TParams. The query now owns
+  // one TParams and every read refreshes it.
+  FDBQuery := FDBConnection.CreateQuery;
+  FDBQuery.CommandText := cSQLUPDATEPARAM;
+
+  LFirst := FDBQuery.Params;
+  LSecond := FDBQuery.Params;
+  Assert.AreSame(LFirst, LSecond, 'every read of Params returns the TParams owned by the query');
+  Assert.AreEqual(2, LFirst.Count, 'with the parameters of the current command');
+
+  FDBQuery.CommandText := Format(cSQLSELECT, ['1']);
+  Assert.AreSame(LFirst, FDBQuery.Params, 'a new command keeps the same TParams');
+  Assert.AreEqual(0, FDBQuery.Params.Count, 'and refreshes its content');
 end;
 
 procedure TTestDriverConnection.TestCreateDataSet;
